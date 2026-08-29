@@ -486,7 +486,20 @@ document.getElementById('topActions').innerHTML=topActions.length
   ? topActions.slice(0,3).map((a,i)=>`<div class="top-action"><b>${i+1}</b> <span>${esc(a)}</span></div>`).join('')
   : '<div class="meta">No critical actions found.</div>';
 renderList('deductions',data.deductions,'deduction');renderList('extraPay',data.extra_pay,'extra');renderActions(data.actions);renderList('unclear',data.missing_or_unclear,'unclear');const qs=data.questions_for_broker||[];document.getElementById('questions').innerHTML=qs.length?qs.map(q=>`<div class="action">• ${esc(q)}</div>`).join(''):'<div class="meta">No specific questions generated.</div>';result.scrollIntoView({behavior:'smooth',block:'start'});}
-if(form)form.addEventListener('submit',async e=>{e.preventDefault();errorBox.style.display='none';const file=fileInput.files?.[0];if(!file)return;if(file.size>4*1024*1024){errorBox.textContent='File is too large. Please upload a file under 4 MB.';errorBox.style.display='block';return;}btn.disabled=true;loading.style.display='block';let i=0;loadingText.textContent=loadingMessages[0];loadingTimer=setInterval(()=>{i=(i+1)%loadingMessages.length;loadingText.textContent=loadingMessages[i];},2200);try{const fileData=await readAsDataURL(file);const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:file.name,mimeType:file.type||'application/pdf',fileData})});const payload=await res.json();if(!res.ok)throw new Error(payload.error||'Analysis failed.');render(payload);}catch(err){errorBox.textContent=err.message||'Analysis failed. Please try again.';errorBox.style.display='block';}finally{clearInterval(loadingTimer);loading.style.display='none';btn.disabled=false;}});
+
+if(fileInput)fileInput.addEventListener('change',()=>{
+  const file=fileInput.files?.[0];
+  if(!file)return;
+  const ext=(file.name.split('.').pop()||'unknown').toLowerCase();
+  const sizeMb=file.size/(1024*1024);
+  const sizeBucket=sizeMb<0.5?'<0.5MB':sizeMb<1?'0.5-1MB':sizeMb<2?'1-2MB':sizeMb<4?'2-4MB':'4MB+';
+  window.rateconTrack?.('ratecon_upload_selected',{
+    file_type:ext,
+    size_bucket:sizeBucket
+  });
+});
+
+if(form)form.addEventListener('submit',async e=>{e.preventDefault();errorBox.style.display='none';const file=fileInput.files?.[0];if(!file)return;if(file.size>4*1024*1024){errorBox.textContent='File is too large. Please upload a file under 4 MB.';errorBox.style.display='block';window.rateconTrack?.('ratecon_analysis_error',{error_type:'file_too_large'});return;}const startedAt=Date.now();window.rateconTrack?.('ratecon_analysis_started',{file_type:(file.name.split('.').pop()||'unknown').toLowerCase()});btn.disabled=true;loading.style.display='block';let i=0;loadingText.textContent=loadingMessages[0];loadingTimer=setInterval(()=>{i=(i+1)%loadingMessages.length;loadingText.textContent=loadingMessages[i];},2200);try{const fileData=await readAsDataURL(file);const res=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:file.name,mimeType:file.type||'application/pdf',fileData})});const payload=await res.json();if(!res.ok){const apiErr=new Error(payload.error||'Analysis failed.');apiErr.status=res.status;throw apiErr;}render(payload);window.rateconTrack?.('ratecon_analysis_success',{risk_score:Number(payload.summary?.risk_score||0),duration_ms:Date.now()-startedAt});}catch(err){errorBox.textContent=err.message||'Analysis failed. Please try again.';errorBox.style.display='block';window.rateconTrack?.('ratecon_analysis_error',{error_type:err.status?`http_${err.status}`:'client_or_network',duration_ms:Date.now()-startedAt});}finally{clearInterval(loadingTimer);loading.style.display='none';btn.disabled=false;}});
 
 </script>
 </body>
