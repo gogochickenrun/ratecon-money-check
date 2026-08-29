@@ -1,4 +1,4 @@
-# RateCon Money Check — SEO 版
+# RateConRisk — SEO 版
 
 这版包含：
 
@@ -20,11 +20,11 @@
 
 代码目前统一使用：
 
-`https://rateconmoneycheck.com`
+`https://rateconrisk.com`
 
 如果最终买的不是这个域名，请在整个项目里全局替换：
 
-`https://rateconmoneycheck.com`
+`https://rateconrisk.com`
 
 替换成你买的正式域名，例如：
 
