@@ -1,7 +1,7 @@
 // RateConRisk Google Analytics 4 loader.
 // Paste the real Measurement ID below after creating the GA4 Web data stream.
 // Example format: G-ABC123DEF4
-const RATECONRISK_GA_ID = "";
+const RATECONRISK_GA_ID = "G-ETTCBWC4CH";
 
 if (RATECONRISK_GA_ID && /^G-[A-Z0-9]+$/i.test(RATECONRISK_GA_ID)) {
   const script = document.createElement("script");
