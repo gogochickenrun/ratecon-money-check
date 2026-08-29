@@ -115,3 +115,20 @@
 - original data reports based on anonymized clause statistics
 
 真正能形成护城河的是“真实 Rate Con 条款数据”，不是文章数量。
+
+
+## V4 结果页优化
+
+结果第一屏现在优先展示：
+- Money Risk Score
+- Potential deductions
+- Detention summary
+- Base load pay
+- 3 things you must not miss
+
+详细扣款、额外收入、动作、缺失条款和 Broker 问题继续放在下面。
+
+Prompt 也收紧：
+- `may result in` 不再写成必扣
+- 不把比例费用/开放式 offset 硬凑成美元总额
+- missing/unclear 只报告真正缺失或含糊的内容

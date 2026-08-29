@@ -10,9 +10,17 @@ const reportSchema = {
       properties: {
         base_pay: { type: "string" },
         risk_score: { type: "integer", minimum: 0, maximum: 100 },
-        top_warning: { type: "string" }
+        potential_deductions: { type: "string" },
+        detention_summary: { type: "string" },
+        top_warning: { type: "string" },
+        top_actions: {
+          type: "array",
+          minItems: 3,
+          maxItems: 3,
+          items: { type: "string" }
+        }
       },
-      required: ["base_pay", "risk_score", "top_warning"]
+      required: ["base_pay", "risk_score", "potential_deductions", "detention_summary", "top_warning", "top_actions"]
     },
     deductions: {
       type: "array",
@@ -166,6 +174,14 @@ Rules:
 8. top_warning = the single most important action or risk affecting payment.
 9. For action deadlines, use the exact timing from the document when stated. Otherwise use "No exact deadline stated."
 10. base_pay should contain the exact total/base rate if found, otherwise "Not found".
+11. potential_deductions should summarize ONLY fixed or clearly calculable deductions explicitly stated in the document.
+    - Use cautious wording such as "Up to $600+ stated potential deductions" or "$400 in stated fixed deductions found".
+    - Do NOT call deductions automatic unless the document explicitly says automatic.
+    - Do NOT combine percentage fees, open-ended offsets, cargo claims, or unknown amounts into a fake dollar total.
+12. detention_summary should be one short line such as "$75/hr after 2 free hours" using only the document's exact terms. If detention is not found, return "Not found".
+13. top_actions must contain exactly 3 short, concrete actions that most protect payment on this load.
+14. Missing-or-unclear items must be genuinely missing or ambiguous. If the document explicitly states pickup and delivery check calls, do not call the frequency unclear merely because no additional periodic schedule is listed.
+15. Preserve uncertainty. If the document says "may result in", "subject to", "can be deducted", or similar, keep that uncertainty in the output.
 `;
 
 function extractText(interaction) {
