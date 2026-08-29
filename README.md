@@ -132,3 +132,12 @@ Prompt 也收紧：
 - `may result in` 不再写成必扣
 - 不把比例费用/开放式 offset 硬凑成美元总额
 - missing/unclear 只报告真正缺失或含糊的内容
+
+
+## V5 MVP cleanup
+- Prevents top warning from contradicting the fixed deduction total.
+- Replaces awkward wording like "Up to $650+" with a single fixed-dollar summary.
+- Excludes optional percentage fees and open-ended offsets from the fixed-dollar total.
+- Avoids broker questions already answered by the Rate Con.
+- Fixes copied top-action text so numbering reads "1 Accept..." instead of "1Accept...".
+- Default Gemini model now matches `gemini-3-flash-preview`.

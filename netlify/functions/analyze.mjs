@@ -1,4 +1,4 @@
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.7-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
 const reportSchema = {
   type: "object",
@@ -171,17 +171,20 @@ Rules:
 6. For every important finding, identify the page/section when visible. If page numbering is unavailable, cite a short heading or identifying phrase.
 7. risk_score = operational risk of preventable lost pay based ONLY on this uploaded document:
    0-29 low, 30-59 moderate, 60-100 high.
-8. top_warning = the single most important action or risk affecting payment.
+8. top_warning = the single most important action or risk affecting payment. Do NOT calculate or restate a combined deduction total here; potential_deductions is the only summary field that should contain a combined fixed-dollar figure.
 9. For action deadlines, use the exact timing from the document when stated. Otherwise use "No exact deadline stated."
 10. base_pay should contain the exact total/base rate if found, otherwise "Not found".
-11. potential_deductions should summarize ONLY fixed or clearly calculable deductions explicitly stated in the document.
-    - Use cautious wording such as "Up to $600+ stated potential deductions" or "$400 in stated fixed deductions found".
+11. potential_deductions should summarize ONLY fixed-dollar deductions explicitly stated in the document.
+    - Prefer wording like: "Fixed deductions identified: $650 across listed requirements, plus repeatable/variable charges."
+    - Never use contradictory phrasing such as "Up to $650+".
+    - If a deduction can repeat per occurrence, you may include ONE occurrence in the fixed-dollar figure, but explicitly note that repeatable charges can increase the total.
     - Do NOT call deductions automatic unless the document explicitly says automatic.
-    - Do NOT combine percentage fees, open-ended offsets, cargo claims, or unknown amounts into a fake dollar total.
+    - Do NOT combine percentage fees, open-ended offsets, cargo claims, unknown amounts, or optional quick-pay fees into the fixed-dollar total.
 12. detention_summary should be one short line such as "$75/hr after 2 free hours" using only the document's exact terms. If detention is not found, return "Not found".
 13. top_actions must contain exactly 3 short, concrete actions that most protect payment on this load.
 14. Missing-or-unclear items must be genuinely missing or ambiguous. If the document explicitly states pickup and delivery check calls, do not call the frequency unclear merely because no additional periodic schedule is listed.
 15. Preserve uncertainty. If the document says "may result in", "subject to", "can be deducted", or similar, keep that uncertainty in the output.
+16. questions_for_broker must ask only about information that is genuinely unanswered in the document AND could materially affect payment or eligibility. Do not ask whether extra check-call times exist when the document already states the required check calls, unless the document itself indicates another schedule. It is acceptable to return fewer than 3 questions.
 `;
 
 function extractText(interaction) {
