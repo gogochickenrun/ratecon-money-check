@@ -141,3 +141,36 @@ Prompt 也收紧：
 - Avoids broker questions already answered by the Rate Con.
 - Fixes copied top-action text so numbering reads "1 Accept..." instead of "1Accept...".
 - Default Gemini model now matches `gemini-3-flash-preview`.
+
+
+## CodexCN relay migration
+
+RateConRisk now uses the same relay approach as Velora:
+
+`Browser → Netlify Function → CodexCN Responses API → Codex model`
+
+Defaults:
+- Base URL: `https://api2.codexcn.com/v1`
+- Endpoint: `/responses`
+- Model: `gpt-5.6-sol`
+
+### Netlify environment variables
+
+Required:
+`CODEXCN_API_KEY = your relay API key`
+
+Optional:
+`CODEXCN_BASE_URL = https://api2.codexcn.com/v1`
+`CODEXCN_MODEL = gpt-5.6-sol`
+
+After adding the key, redeploy the RateConRisk Netlify project.
+
+The old `GEMINI_API_KEY` and `GEMINI_MODEL` variables are no longer used and can be removed after confirming the new version works.
+
+Preserved:
+- PDF / JPG / PNG / WebP upload
+- 4 MB upload limit
+- structured money-risk report
+- existing SEO pages
+- sitemap / robots
+- existing GA4 and RateConRisk custom events

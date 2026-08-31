@@ -1,4 +1,5 @@
-const MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+const BASE_URL = (process.env.CODEXCN_BASE_URL || "https://api2.codexcn.com/v1").replace(/\/+$/, "");
+const MODEL = process.env.CODEXCN_MODEL || "gpt-5.6-sol";
 
 const reportSchema = {
   type: "object",
@@ -205,10 +206,28 @@ function extractText(interaction) {
   return null;
 }
 
+
 function cleanBase64(dataUrl) {
   if (typeof dataUrl !== "string") return "";
   const comma = dataUrl.indexOf(",");
   return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+}
+
+function extractOutputText(data) {
+  if (typeof data?.output_text === "string" && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  const chunks = [];
+  for (const item of data?.output || []) {
+    if (item?.type !== "message") continue;
+    for (const part of item?.content || []) {
+      if (part?.type === "output_text" && typeof part.text === "string") {
+        chunks.push(part.text);
+      }
+    }
+  }
+  return chunks.join("").trim();
 }
 
 export const handler = async (event) => {
@@ -220,8 +239,9 @@ export const handler = async (event) => {
     };
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.CODEXCN_API_KEY;
   if (!apiKey) {
+    console.error("[RateConRisk] CODEXCN_API_KEY missing");
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
@@ -247,11 +267,7 @@ export const handler = async (event) => {
       mimeType === "application/pdf" ||
       filename.toLowerCase().endsWith(".pdf");
 
-    const allowedImages = new Set([
-      "image/jpeg",
-      "image/png",
-      "image/webp"
-    ]);
+    const allowedImages = new Set(["image/jpeg", "image/png", "image/webp"]);
     const isImage = allowedImages.has(mimeType);
 
     if (!isPdf && !isImage) {
@@ -262,7 +278,6 @@ export const handler = async (event) => {
       };
     }
 
-    // Keep decoded binary safely below Netlify's buffered payload ceiling.
     const approxBytes = Math.floor(base64.length * 0.75);
     if (approxBytes > 4 * 1024 * 1024) {
       return {
@@ -272,67 +287,110 @@ export const handler = async (event) => {
       };
     }
 
-    const mediaInput = isPdf
+    const fileContent = isPdf
       ? {
-          type: "document",
-          data: base64,
-          mime_type: "application/pdf"
+          type: "input_file",
+          filename: filename || "rate-confirmation.pdf",
+          file_data: `data:application/pdf;base64,${base64}`
         }
       : {
-          type: "image",
-          data: base64,
-          mime_type: mimeType
+          type: "input_image",
+          image_url: `data:${mimeType};base64,${base64}`,
+          detail: "high"
         };
 
     const payload = {
       model: MODEL,
+      instructions:
+        "You are reviewing a U.S. trucking Rate Confirmation. " +
+        "Return only valid JSON matching the requested schema. Do not use markdown fences.",
       input: [
-        mediaInput,
         {
-          type: "text",
-          text: reviewPrompt
+          role: "user",
+          content: [
+            fileContent,
+            { type: "input_text", text: reviewPrompt }
+          ]
         }
       ],
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema: reportSchema
-      }
+      text: {
+        format: {
+          type: "json_schema",
+          name: "rate_confirmation_risk_report",
+          strict: true,
+          schema: reportSchema
+        }
+      },
+      reasoning: { effort: "low" },
+      max_output_tokens: 5000,
+      store: false
     };
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/interactions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify(payload)
-      }
-    );
+    const response = await fetch(`${BASE_URL}/responses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
 
-    const data = await response.json();
+    const rawText = await response.text();
+    let data = null;
 
-    if (!response.ok) {
-      console.error("Analysis provider error:", JSON.stringify(data));
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      console.error("[RateConRisk] Provider returned non-JSON", {
+        status: response.status,
+        body: rawText.slice(0, 1000)
+      });
       return {
-        statusCode: response.status,
+        statusCode: 502,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          error: data?.error?.message || "Analysis failed. Please try again."
+          error: `Analysis provider returned HTTP ${response.status} with a non-JSON response.`
         })
       };
     }
 
-    const outputText = extractText(data);
+    if (!response.ok) {
+      const providerMessage =
+        data?.error?.message ||
+        data?.message ||
+        `Analysis provider returned HTTP ${response.status}.`;
+
+      console.error("[RateConRisk] Provider error", {
+        status: response.status,
+        model: MODEL,
+        message: providerMessage
+      });
+
+      return {
+        statusCode: response.status >= 400 && response.status < 600 ? response.status : 502,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: providerMessage })
+      };
+    }
+
+    const outputText = extractOutputText(data);
 
     if (!outputText) {
-      console.error("No text result:", JSON.stringify(data));
+      console.error("[RateConRisk] No text output", {
+        model: MODEL,
+        providerStatus: data?.status,
+        incompleteDetails: data?.incomplete_details,
+        body: JSON.stringify(data).slice(0, 1500)
+      });
+
       return {
         statusCode: 502,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "No usable result was returned." })
+        body: JSON.stringify({
+          error: data?.incomplete_details?.reason
+            ? `Analysis was incomplete: ${data.incomplete_details.reason}.`
+            : "No usable result was returned."
+        })
       };
     }
 
@@ -340,13 +398,23 @@ export const handler = async (event) => {
     try {
       parsed = JSON.parse(outputText);
     } catch {
-      console.error("Invalid JSON output:", outputText);
+      console.error("[RateConRisk] Invalid JSON output", outputText.slice(0, 2000));
       return {
         statusCode: 502,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "The result could not be parsed. Please try again." })
+        body: JSON.stringify({
+          error: "The analysis result could not be parsed. Please try again."
+        })
       };
     }
+
+    console.log("[RateConRisk] analysis success", {
+      provider: "codexcn",
+      model: MODEL,
+      fileType: isPdf ? "pdf" : mimeType,
+      inputTokens: data?.usage?.input_tokens ?? null,
+      outputTokens: data?.usage?.output_tokens ?? null
+    });
 
     return {
       statusCode: 200,
@@ -357,13 +425,11 @@ export const handler = async (event) => {
       body: JSON.stringify(parsed)
     };
   } catch (err) {
-    console.error(err);
+    console.error("[RateConRisk] Unexpected error", err);
     return {
       statusCode: 500,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        error: err?.message || "Unexpected error."
-      })
+      body: JSON.stringify({ error: err?.message || "Unexpected error." })
     };
   }
 };
