@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in | RateConRisk</title><meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="/assets/fleet.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets/analytics.js"></script>
+<script src="/assets/cloud.js"></script>
+</head>
+<body class="fleet-app">
+<div class="auth-page">
+  <div class="auth-card">
+    <a class="fleet-brand" href="/" style="padding:0">RateCon<span>Risk</span></a>
+    <div class="section-label" style="margin-top:26px">OWNER-OPERATOR ACCOUNT</div>
+    <h1>Your loads. Your numbers. Any device.</h1>
+    <p>Sign in with a secure email link. No password required. Your loads, expenses, trucks and receivables sync to your account.</p>
+
+    <form id="loginForm">
+      <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@example.com">
+      <button class="fleet-btn" style="width:100%;padding:13px" id="sendBtn">Email me a sign-in link</button>
+    </form>
+
+    <div class="auth-message" id="message"></div>
+    <p class="small-muted" style="margin-top:18px">If cloud sync has not been configured yet, the owner-operator dashboard remains available in local preview mode.</p>
+  </div>
+</div>
+<script>
+(async()=>{
+  const state=await RateConCloud.init();
+  const msg=document.getElementById("message");
+  const next=new URLSearchParams(location.search).get("next")||"/app/";
+
+  if(!state.configured){
+    msg.className="auth-message show bad";
+    msg.innerHTML='Cloud sync is not configured yet. Add <b>SUPABASE_URL</b> and <b>SUPABASE_PUBLISHABLE_KEY</b> in Netlify first. <a href="/app/" style="color:inherit">Open local preview mode</a>.';
+    document.getElementById("sendBtn").disabled=true;
+    return;
+  }
+
+  if(state.user){
+    location.href=next;
+    return;
+  }
+
+  loginForm.addEventListener("submit",async e=>{
+    e.preventDefault();
+    sendBtn.disabled=true;sendBtn.textContent="Sending…";
+    try{
+      await RateConCloud.sendMagicLink(email.value.trim());
+      msg.className="auth-message show good";
+      msg.textContent="Check your email. Open the sign-in link and you’ll come back to your dashboard.";
+      window.rateconTrack?.("fleet_magic_link_sent");
+    }catch(err){
+      msg.className="auth-message show bad";
+      msg.textContent=err.message||"Could not send sign-in link.";
+    }finally{
+      sendBtn.disabled=false;sendBtn.textContent="Email me a sign-in link";
+    }
+  });
+})();
+</script>
+</body></html>

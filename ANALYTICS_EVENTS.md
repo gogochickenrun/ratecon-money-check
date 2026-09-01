@@ -21,3 +21,13 @@ No filename or document contents are sent to Google Analytics.
 - `fleet_expense_added`
 - `fleet_status_changed`
 - `fleet_document_changed`
+
+
+## V6 cloud / finance events
+- `fleet_magic_link_sent`
+- `fleet_local_data_migrated`
+- `fleet_truck_created`
+- `fleet_receivables_view`
+
+Recommended funnel:
+Rate Con analyzed → Save as Load → Add Truck → Add Expense → Invoice → Paid → Return next week

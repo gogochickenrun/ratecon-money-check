@@ -3,13 +3,35 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Broker Scorecard | RateConRisk</title><meta name="robots" content="noindex,nofollow">
 <link rel="stylesheet" href="/assets/fleet.css">
-<script src="/assets/analytics.js"></script><script src="/assets/fleet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets/analytics.js"></script>
+<script src="/assets/cloud.js"></script>
+<script src="/assets/store.js"></script>
 </head><body class="fleet-app"><div class="fleet-layout">
-<aside class="fleet-sidebar"><a class="fleet-brand" href="/">RateCon<span>Risk</span></a><nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/brokers/" class="active">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
-<div class="fleet-sidebar-bottom">Owner-operator business tools.<br>V1 stores data on this browser only.</div></aside>
-<main class="fleet-main"><header class="fleet-topbar"><h1>Broker Scorecard</h1><div class="fleet-top-actions"><a class="fleet-btn secondary" href="/#check">Check Rate Con</a><button class="fleet-btn" id="primaryAction" type="button">Add Load</button></div></header>
-<div class="fleet-content"><div class="fleet-note">MVP note: business data is stored only in this browser for now. Account sync and cloud storage come after we validate repeat use.</div>
-<section class="fleet-card"><div class="fleet-card-head"><div><h2>Broker scorecard</h2><p>See which brokers actually produce revenue, profit and unpaid exposure.</p></div></div><div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Broker</th><th>Loads</th><th>Revenue</th><th>True RPM</th><th>Profit</th><th>Unpaid</th><th>Avg risk</th></tr></thead><tbody id="brokerRows"></tbody></table></div><div class="empty-state" id="emptyBrokers"><b>No broker history yet.</b>Add loads or save an analyzed Rate Con.</div></section></div>
-</main></div><script>
-const F=RateConFleet;primaryAction.textContent="Analyze Rate Con";primaryAction.onclick=()=>location.href="/#check";
-function render(){const rows=F.brokers();emptyBrokers.style.display=rows.length?"none":"block";brokerRows.innerHTML=rows.map(b=>{const riskClass=b.avgRisk>=70?"risk-high":b.avgRisk>=40?"risk-mid":"risk-low";return `<tr><td class="broker-name">${b.broker}</td><td>${b.loads}</td><td class="money">${F.money(b.revenue)}</td><td>${F.decimalMoney(b.rpm)}</td><td class="profit">${F.money(b.profit)}</td><td>${F.money(b.unpaid)}</td><td class="${riskClass}">${Math.round(b.avgRisk)}/100</td></tr>`}).join("")}render();</script></body></html>
+<aside class="fleet-sidebar">
+  <a class="fleet-brand" href="/">RateCon<span>Risk</span></a>
+  <nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/receivables/" class="">Receivables</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/trucks/" class="">Trucks</a><a href="/app/brokers/" class="active">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
+  <div class="fleet-sidebar-bottom">Owner-operator business tools.<br><span data-cloud-mode>Starting…</span></div>
+</aside>
+<main class="fleet-main">
+<header class="fleet-topbar">
+  <h1>Broker Scorecard</h1>
+  <div class="fleet-top-actions">
+    <span class="sync-badge"><i class="sync-dot"></i><span data-cloud-mode>Starting…</span></span>
+    <a class="fleet-btn secondary" href="/#check">Check Rate Con</a>
+    <button class="fleet-btn" id="primaryAction" type="button">Add Load</button>
+    <div class="fleet-user"><span data-user-email>Guest</span><button data-signout>Sign out</button></div>
+  </div>
+</header>
+<div class="fleet-content">
+<section class="fleet-card"><div class="fleet-card-head"><div><h2>Broker scorecard</h2><p>Revenue, RPM, unpaid exposure, Rate Con risk and actual payment speed.</p></div></div>
+<div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Broker</th><th>Loads</th><th>Revenue</th><th>RPM</th><th>Direct profit</th><th>Unpaid</th><th>Avg days to pay</th><th>Avg risk</th></tr></thead><tbody id="brokerRows"></tbody></table></div>
+<div class="empty-state" id="emptyBrokers"><b>No broker history yet.</b>Save real loads to build your broker scorecard.</div></section></div>
+</main></div>
+<script src="/assets/app-shell.js"></script>
+<script>
+window.addEventListener("ratecon:appready", async()=>{ try{ 
+primaryAction.textContent="Analyze Rate Con";primaryAction.onclick=()=>location.href="/#check";const data=await RateConStore.read(),rows=RateConStore.brokers(data);emptyBrokers.style.display=rows.length?"none":"block";brokerRows.innerHTML=rows.map(b=>{const rc=b.avgRisk>=70?"risk-high":b.avgRisk>=40?"risk-mid":"risk-low";return `<tr><td class="broker-name">${b.broker}</td><td>${b.loads}</td><td class="money">${RateConStore.money(b.revenue)}</td><td>${RateConStore.money2(b.rpm)}</td><td class="profit">${RateConStore.money(b.profit)}</td><td>${RateConStore.money(b.unpaid)}</td><td>${b.avgDaysToPay===null?"—":`${Math.round(b.avgDaysToPay)} days`}</td><td class="${rc}">${Math.round(b.avgRisk)}/100</td></tr>`}).join("");
+ }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
+</script>
+</body></html>

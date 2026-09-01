@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trucks | RateConRisk</title><meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="/assets/fleet.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets/analytics.js"></script>
+<script src="/assets/cloud.js"></script>
+<script src="/assets/store.js"></script>
+</head><body class="fleet-app"><div class="fleet-layout">
+<aside class="fleet-sidebar">
+  <a class="fleet-brand" href="/">RateCon<span>Risk</span></a>
+  <nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/receivables/" class="">Receivables</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/trucks/" class="active">Trucks</a><a href="/app/brokers/" class="">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
+  <div class="fleet-sidebar-bottom">Owner-operator business tools.<br><span data-cloud-mode>Starting…</span></div>
+</aside>
+<main class="fleet-main">
+<header class="fleet-topbar">
+  <h1>Trucks</h1>
+  <div class="fleet-top-actions">
+    <span class="sync-badge"><i class="sync-dot"></i><span data-cloud-mode>Starting…</span></span>
+    <a class="fleet-btn secondary" href="/#check">Check Rate Con</a>
+    <button class="fleet-btn" id="primaryAction" type="button">Add Load</button>
+    <div class="fleet-user"><span data-user-email>Guest</span><button data-signout>Sign out</button></div>
+  </div>
+</header>
+<div class="fleet-content">
+<section class="fleet-card">
+<div class="fleet-card-head"><div><h2>Trucks & fixed costs</h2><p>Monthly truck payment, insurance and fixed overhead drive your real cost per mile.</p></div></div>
+<div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Truck</th><th>This month loads</th><th>Miles</th><th>Revenue</th><th>Variable costs</th><th>Fixed costs</th><th>True CPM</th><th>Profit</th><th></th></tr></thead><tbody id="truckRows"></tbody></table></div>
+<div class="empty-state" id="emptyTrucks"><b>No trucks yet.</b>Add your truck so RateConRisk can calculate a real cost per mile.</div>
+</section>
+<div id="truckModal" class="modal-backdrop"><div class="fleet-modal">
+<div class="fleet-modal-head"><h2>Add truck</h2><button class="icon-btn" id="closeModal">×</button></div>
+<div class="fleet-modal-body"><p class="modal-subtitle">These are monthly fixed costs. Fuel, tolls and maintenance belong in Expenses.</p>
+<form id="truckForm"><div class="fleet-form-grid">
+<div class="fleet-field"><label>Unit #</label><input name="unitNumber" required placeholder="001"></div>
+<div class="fleet-field"><label>Nickname</label><input name="nickname" placeholder="Blue Pete"></div>
+<div class="fleet-field"><label>Year</label><input name="year" type="number" min="1980" max="2035"></div>
+<div class="fleet-field"><label>Make / model</label><input name="makeModel" placeholder="Peterbilt 579"></div>
+<div class="fleet-field"><label>Truck payment / month ($)</label><input name="monthlyTruckPayment" type="number" min="0" step="0.01"></div>
+<div class="fleet-field"><label>Insurance / month ($)</label><input name="monthlyInsurance" type="number" min="0" step="0.01"></div>
+<div class="fleet-field"><label>Permits / month ($)</label><input name="monthlyPermits" type="number" min="0" step="0.01"></div>
+<div class="fleet-field"><label>Other fixed / month ($)</label><input name="monthlyOtherFixed" type="number" min="0" step="0.01"></div>
+</div><div class="fleet-form-actions"><button type="button" class="fleet-btn secondary" id="cancelModal">Cancel</button><button class="fleet-btn">Save truck</button></div></form>
+</div></div></div></div>
+</main></div>
+<script src="/assets/app-shell.js"></script>
+<script>
+window.addEventListener("ratecon:appready", async()=>{ try{ 
+const modal=truckModal,open=()=>modal.classList.add("show"),close=()=>modal.classList.remove("show");primaryAction.textContent="Add Truck";primaryAction.onclick=open;closeModal.onclick=cancelModal.onclick=close;
+truckForm.onsubmit=async e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(e.currentTarget).entries()),mm=(fd.makeModel||"").trim().split(/\s+/);await RateConStore.addTruck({...fd,make:mm.shift()||"",model:mm.join(" ")});e.currentTarget.reset();close();render()};
+async function render(){const data=await RateConStore.read();emptyTrucks.style.display=data.trucks.length?"none":"block";truckRows.innerHTML=data.trucks.map(t=>{const m=RateConStore.truckMetrics(t,data);return `<tr><td><div class="truck-title"><span class="truck-unit">${t.unitNumber||"Truck"}</span><span class="small-muted">${[t.year,t.make,t.model].filter(Boolean).join(" ")}</span></div></td><td>${m.loads}</td><td>${Math.round(m.miles).toLocaleString()}</td><td class="money">${RateConStore.money(m.revenue)}</td><td>${RateConStore.money(m.variable)}</td><td>${RateConStore.money(m.fixed)}</td><td class="money">${RateConStore.money2(m.cpm)}</td><td class="profit">${RateConStore.money(m.profit)}</td><td><button class="delete-btn" data-delete="${t.id}">Delete</button></td></tr>`}).join("");document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this truck? Existing loads will remain but become unassigned.")){await RateConStore.removeTruck(b.dataset.delete);render()}})}
+await render();
+ }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
+</script>
+</body></html>

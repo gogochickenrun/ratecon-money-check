@@ -240,3 +240,64 @@ Rate Con analysis now extracts load metadata and includes a **Save as Load** act
 The V1 business dashboard calculates revenue, expenses, profit and true RPM with normal code, not the language model.
 
 Current MVP storage is browser-local. Before production-grade financial use, add authentication, cloud database and backups.
+
+
+## V6 — Cloud owner-operator operating system
+
+V6 adds the three major pieces needed for a real daily-use product:
+
+### 1. Login + cloud data
+- Email magic-link authentication with Supabase Auth.
+- Loads, trucks and expenses sync to PostgreSQL.
+- Row Level Security isolates every user's business data.
+- Existing local browser data can automatically migrate into the user's cloud account if the cloud account is empty.
+- If Supabase has not been configured yet, the app falls back to local preview mode instead of breaking the existing site.
+
+### 2. Invoice / AR / payment speed
+Loads now support:
+- invoice number
+- invoice date
+- due date
+- paid date
+- amount paid
+- days outstanding
+- days to pay
+
+New page:
+`/app/receivables/`
+
+Broker Scorecard now includes average days to pay.
+
+### 3. Trucks + real cost per mile
+New page:
+`/app/trucks/`
+
+Each truck can store monthly:
+- truck payment
+- insurance
+- permits
+- other fixed costs
+
+Current-month True CPM is calculated in normal code:
+
+`(tracked variable expenses + monthly fixed truck costs) / tracked miles`
+
+Load "true profit" allocates monthly fixed truck cost by the truck's tracked miles.
+
+### Supabase setup
+
+1. Create a Supabase project.
+2. Open SQL Editor.
+3. Run:
+   `supabase/schema.sql`
+4. In Authentication → URL Configuration:
+   - Site URL: `https://rateconrisk.com`
+   - Add redirect URL: `https://rateconrisk.com/app/login/*`
+5. In Netlify → RateConRisk → Environment variables, add:
+   - `SUPABASE_URL`
+   - `SUPABASE_PUBLISHABLE_KEY`
+6. Redeploy.
+
+The publishable key is designed for client-side use. RLS is what protects each user's rows.
+
+Existing `CODEXCN_API_KEY` remains unchanged for Rate Con analysis.

@@ -3,22 +3,64 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Loads | RateConRisk</title><meta name="robots" content="noindex,nofollow">
 <link rel="stylesheet" href="/assets/fleet.css">
-<script src="/assets/analytics.js"></script><script src="/assets/fleet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets/analytics.js"></script>
+<script src="/assets/cloud.js"></script>
+<script src="/assets/store.js"></script>
 </head><body class="fleet-app"><div class="fleet-layout">
-<aside class="fleet-sidebar"><a class="fleet-brand" href="/">RateCon<span>Risk</span></a><nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="active">Loads</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/brokers/" class="">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
-<div class="fleet-sidebar-bottom">Owner-operator business tools.<br>V1 stores data on this browser only.</div></aside>
-<main class="fleet-main"><header class="fleet-topbar"><h1>Loads</h1><div class="fleet-top-actions"><a class="fleet-btn secondary" href="/#check">Check Rate Con</a><button class="fleet-btn" id="primaryAction" type="button">Add Load</button></div></header>
-<div class="fleet-content"><div class="fleet-note">MVP note: business data is stored only in this browser for now. Account sync and cloud storage come after we validate repeat use.</div>
-<div id="importBanner" class="fleet-import" style="display:none"><div><strong>Rate Con analysis ready to save</strong><span>Review the extracted load details, then save it to your business dashboard.</span></div><button class="fleet-btn" id="reviewImport">Review load</button></div>
-<section class="fleet-card"><div class="fleet-card-head"><div><h2>Loads</h2><p>Track each load from booked to paid and see true profit.</p></div><button class="fleet-btn secondary" id="exportCsv">Export CSV</button></div>
-<div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Load</th><th>Broker</th><th>Route</th><th>Status</th><th>Revenue</th><th>Miles</th><th>Expenses</th><th>Profit</th><th>RPM</th><th></th></tr></thead><tbody id="loadRows"></tbody></table></div><div class="empty-state" id="emptyLoads"><b>No loads yet.</b>Use “Add Load” or analyze a Rate Con first.</div></section>
-<div id="loadModal" class="modal-backdrop"><div class="fleet-modal"><div class="fleet-modal-head"><h2>Add load</h2><button class="icon-btn" id="closeModal">×</button></div><div class="fleet-modal-body"><form id="loadForm">
-<div class="fleet-form-grid"><div class="fleet-field"><label>Load #</label><input name="loadNumber"></div><div class="fleet-field"><label>Broker</label><input name="broker"></div><div class="fleet-field"><label>Origin</label><input name="origin"></div><div class="fleet-field"><label>Destination</label><input name="destination"></div><div class="fleet-field"><label>Pickup date</label><input name="pickupDate" type="date"></div><div class="fleet-field"><label>Delivery date</label><input name="deliveryDate" type="date"></div><div class="fleet-field"><label>Revenue ($)</label><input name="revenue" type="number" min="0" step="0.01"></div><div class="fleet-field"><label>Status</label><select name="status"><option>Booked</option><option>In Transit</option><option>Delivered</option><option>Invoiced</option><option>Paid</option></select></div><div class="fleet-field"><label>Loaded miles</label><input name="loadedMiles" type="number" min="0"></div><div class="fleet-field"><label>Deadhead miles</label><input name="deadheadMiles" type="number" min="0"></div></div>
-<div class="fleet-form-actions"><button type="button" class="fleet-btn secondary" id="cancelModal">Cancel</button><button class="fleet-btn">Save load</button></div></form></div></div></div></div>
-</main></div><script>
-const F=RateConFleet,modal=loadModal,form=loadForm;let importDraft=null;try{importDraft=JSON.parse(sessionStorage.getItem("ratecon_import_draft")||"null")}catch{}if(importDraft)importBanner.style.display="flex";
-const open=(prefill={})=>{modal.classList.add("show");form.reset();Object.entries(prefill).forEach(([k,v])=>{if(form.elements[k]&&v!==undefined&&v!==null)form.elements[k].value=v;})},close=()=>modal.classList.remove("show");
-primaryAction.onclick=()=>open();closeModal.onclick=cancelModal.onclick=close;reviewImport.onclick=()=>{if(importDraft)open(importDraft)};exportCsv.onclick=()=>F.exportLoadsCSV();
-form.onsubmit=e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(form).entries());if(importDraft){fd.riskScore=importDraft.riskScore;fd.potentialDeductions=importDraft.potentialDeductions;fd.sourceFilename=importDraft.sourceFilename;fd.documents={rateCon:true}}F.addLoad(fd);sessionStorage.removeItem("ratecon_import_draft");importDraft=null;importBanner.style.display="none";close();render();};
-function render(){const data=F.read();emptyLoads.style.display=data.loads.length?"none":"block";loadRows.innerHTML=data.loads.map(l=>{const exp=F.loadExpenseTotal(l.id,data),profit=F.loadProfit(l,data),miles=F.loadMiles(l),rpm=miles?l.revenue/miles:0;return `<tr><td>${l.loadNumber||"—"}</td><td>${l.broker||"—"}</td><td class="route">${l.origin||"?"} → ${l.destination||"?"}</td><td><select data-status="${l.id}">${["Booked","In Transit","Delivered","Invoiced","Paid"].map(s=>`<option ${s===l.status?"selected":""}>${s}</option>`).join("")}</select></td><td class="money">${F.money(l.revenue)}</td><td>${Math.round(miles).toLocaleString()}</td><td>${F.money(exp)}</td><td class="profit">${F.money(profit)}</td><td>${F.decimalMoney(rpm)}</td><td><button class="delete-btn" data-delete="${l.id}">Delete</button></td></tr>`}).join("");
-document.querySelectorAll("[data-status]").forEach(el=>el.onchange=()=>{F.updateLoad(el.dataset.status,{status:el.value});window.rateconTrack?.("fleet_status_changed",{status:el.value});render()});document.querySelectorAll("[data-delete]").forEach(el=>el.onclick=()=>{if(confirm("Delete this load and its linked expenses?")){F.removeLoad(el.dataset.delete);render()}})}render();if(importDraft&&new URLSearchParams(location.search).get("import")==="1")open(importDraft);</script></body></html>
+<aside class="fleet-sidebar">
+  <a class="fleet-brand" href="/">RateCon<span>Risk</span></a>
+  <nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="active">Loads</a><a href="/app/receivables/" class="">Receivables</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/trucks/" class="">Trucks</a><a href="/app/brokers/" class="">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
+  <div class="fleet-sidebar-bottom">Owner-operator business tools.<br><span data-cloud-mode>Starting…</span></div>
+</aside>
+<main class="fleet-main">
+<header class="fleet-topbar">
+  <h1>Loads</h1>
+  <div class="fleet-top-actions">
+    <span class="sync-badge"><i class="sync-dot"></i><span data-cloud-mode>Starting…</span></span>
+    <a class="fleet-btn secondary" href="/#check">Check Rate Con</a>
+    <button class="fleet-btn" id="primaryAction" type="button">Add Load</button>
+    <div class="fleet-user"><span data-user-email>Guest</span><button data-signout>Sign out</button></div>
+  </div>
+</header>
+<div class="fleet-content">
+<div id="importBanner" class="fleet-import" style="display:none"><div><strong>Rate Con analysis ready to save</strong><span>Review the extracted load details, assign a truck and save it.</span></div><button class="fleet-btn" id="reviewImport">Review load</button></div>
+<section class="fleet-card">
+<div class="fleet-card-head"><div><h2>Loads</h2><p>From booked to paid — including invoice dates and true profit.</p></div><button class="fleet-btn secondary" id="exportCsv">Export CSV</button></div>
+<div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Load</th><th>Truck</th><th>Broker</th><th>Route</th><th>Status</th><th>Revenue</th><th>Direct costs</th><th>True profit</th><th>Invoice</th><th>AR age</th><th></th></tr></thead><tbody id="loadRows"></tbody></table></div>
+<div class="empty-state" id="emptyLoads"><b>No loads yet.</b>Analyze a Rate Con or add one manually.</div>
+</section>
+<div id="loadModal" class="modal-backdrop"><div class="fleet-modal">
+<div class="fleet-modal-head"><h2 id="modalTitle">Add load</h2><button class="icon-btn" id="closeModal">×</button></div>
+<div class="fleet-modal-body"><form id="loadForm"><input name="id" type="hidden">
+<div class="section-label">LOAD</div><div class="fleet-form-grid">
+<div class="fleet-field"><label>Load #</label><input name="loadNumber"></div>
+<div class="fleet-field"><label>Truck</label><select name="truckId" id="truckSelect"><option value="">Unassigned</option></select></div>
+<div class="fleet-field"><label>Broker</label><input name="broker"></div>
+<div class="fleet-field"><label>Status</label><select name="status"><option>Booked</option><option>In Transit</option><option>Delivered</option><option>Invoiced</option><option>Paid</option></select></div>
+<div class="fleet-field"><label>Origin</label><input name="origin"></div><div class="fleet-field"><label>Destination</label><input name="destination"></div>
+<div class="fleet-field"><label>Pickup date</label><input name="pickupDate" type="date"></div><div class="fleet-field"><label>Delivery date</label><input name="deliveryDate" type="date"></div>
+<div class="fleet-field"><label>Revenue ($)</label><input name="revenue" type="number" min="0" step="0.01"></div><div class="fleet-field"><label>Amount paid ($)</label><input name="amountPaid" type="number" min="0" step="0.01"></div>
+<div class="fleet-field"><label>Loaded miles</label><input name="loadedMiles" type="number" min="0"></div><div class="fleet-field"><label>Deadhead miles</label><input name="deadheadMiles" type="number" min="0"></div>
+</div>
+<div class="section-label" style="margin-top:20px">INVOICE & PAYMENT</div><div class="fleet-form-grid">
+<div class="fleet-field"><label>Invoice #</label><input name="invoiceNumber"></div><div class="fleet-field"><label>Invoice date</label><input name="invoiceDate" type="date"></div>
+<div class="fleet-field"><label>Due date</label><input name="dueDate" type="date"></div><div class="fleet-field"><label>Paid date</label><input name="paidDate" type="date"></div>
+</div>
+<div class="fleet-form-actions"><button type="button" class="fleet-btn secondary" id="cancelModal">Cancel</button><button class="fleet-btn">Save load</button></div>
+</form></div></div></div></div>
+</main></div>
+<script src="/assets/app-shell.js"></script>
+<script>
+window.addEventListener("ratecon:appready", async()=>{ try{ 
+let importDraft=null;try{importDraft=JSON.parse(sessionStorage.getItem("ratecon_import_draft")||"null")}catch{}
+if(importDraft)importBanner.style.display="flex";
+const modal=loadModal,form=loadForm,open=async(prefill={})=>{const data=await RateConStore.read();truckSelect.innerHTML='<option value="">Unassigned</option>'+data.trucks.map(t=>`<option value="${t.id}">${t.unitNumber}${t.nickname?` · ${t.nickname}`:""}</option>`).join("");form.reset();Object.entries(prefill).forEach(([k,v])=>{if(form.elements[k]&&v!==undefined&&v!==null)form.elements[k].value=v});modal.classList.add("show")},close=()=>modal.classList.remove("show");
+primaryAction.textContent="Add Load";primaryAction.onclick=()=>open();closeModal.onclick=cancelModal.onclick=close;reviewImport.onclick=()=>importDraft&&open(importDraft);exportCsv.onclick=()=>RateConStore.exportLoadsCSV();
+form.onsubmit=async e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(form).entries()),id=fd.id;delete fd.id;if(importDraft&&!id){fd.riskScore=importDraft.riskScore;fd.potentialDeductions=importDraft.potentialDeductions;fd.sourceFilename=importDraft.sourceFilename;fd.documents={rateCon:true}}if(fd.paidDate&&Number(fd.amountPaid||0)>=Number(fd.revenue||0))fd.status="Paid";if(id)await RateConStore.updateLoad(id,fd);else await RateConStore.addLoad(fd);sessionStorage.removeItem("ratecon_import_draft");importDraft=null;importBanner.style.display="none";close();render()};
+async function render(){const data=await RateConStore.read();emptyLoads.style.display=data.loads.length?"none":"block";loadRows.innerHTML=data.loads.map(l=>{const t=data.trucks.find(x=>x.id===l.truckId),direct=RateConStore.loadDirectExpenses(l.id,data),profit=RateConStore.loadTrueProfit(l,data),age=RateConStore.daysOutstanding(l);return `<tr><td>${l.loadNumber||"—"}</td><td>${t?.unitNumber||"—"}</td><td>${l.broker||"—"}</td><td class="route">${l.origin||"?"} → ${l.destination||"?"}</td><td><span class="status">${l.status}</span></td><td class="money">${RateConStore.money(l.revenue)}</td><td>${RateConStore.money(direct)}</td><td class="profit">${RateConStore.money(profit)}</td><td>${l.invoiceNumber||"—"}<div class="small-muted">${l.invoiceDate||""}</div></td><td class="${age!==null&&age>30?"ar-overdue":"ar-current"}">${l.status==="Paid"?(RateConStore.daysToPay(l)!==null?`${RateConStore.daysToPay(l)}d to pay`:"Paid"):(age!==null?`${age}d open`:"—")}</td><td><button class="delete-btn" data-edit="${l.id}">Manage</button> · <button class="delete-btn" data-delete="${l.id}">Delete</button></td></tr>`}).join("");
+document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const l=data.loads.find(x=>x.id===b.dataset.edit);open(l)});document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this load and linked expenses?")){await RateConStore.removeLoad(b.dataset.delete);render()}})}
+await render();if(importDraft&&new URLSearchParams(location.search).get("import")==="1")await open(importDraft);if(new URLSearchParams(location.search).get("new")==="1")await open();
+ }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
+</script>
+</body></html>

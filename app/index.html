@@ -3,33 +3,64 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard | RateConRisk</title><meta name="robots" content="noindex,nofollow">
 <link rel="stylesheet" href="/assets/fleet.css">
-<script src="/assets/analytics.js"></script><script src="/assets/fleet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets/analytics.js"></script>
+<script src="/assets/cloud.js"></script>
+<script src="/assets/store.js"></script>
 </head><body class="fleet-app"><div class="fleet-layout">
-<aside class="fleet-sidebar"><a class="fleet-brand" href="/">RateCon<span>Risk</span></a><nav class="fleet-nav"><a href="/app/" class="active">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/brokers/" class="">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
-<div class="fleet-sidebar-bottom">Owner-operator business tools.<br>V1 stores data on this browser only.</div></aside>
-<main class="fleet-main"><header class="fleet-topbar"><h1>Dashboard</h1><div class="fleet-top-actions"><a class="fleet-btn secondary" href="/#check">Check Rate Con</a><button class="fleet-btn" id="primaryAction" type="button">Add Load</button></div></header>
-<div class="fleet-content"><div class="fleet-note">MVP note: business data is stored only in this browser for now. Account sync and cloud storage come after we validate repeat use.</div>
+<aside class="fleet-sidebar">
+  <a class="fleet-brand" href="/">RateCon<span>Risk</span></a>
+  <nav class="fleet-nav"><a href="/app/" class="active">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/receivables/" class="">Receivables</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/trucks/" class="">Trucks</a><a href="/app/brokers/" class="">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
+  <div class="fleet-sidebar-bottom">Owner-operator business tools.<br><span data-cloud-mode>Starting…</span></div>
+</aside>
+<main class="fleet-main">
+<header class="fleet-topbar">
+  <h1>Dashboard</h1>
+  <div class="fleet-top-actions">
+    <span class="sync-badge"><i class="sync-dot"></i><span data-cloud-mode>Starting…</span></span>
+    <a class="fleet-btn secondary" href="/#check">Check Rate Con</a>
+    <button class="fleet-btn" id="primaryAction" type="button">Add Load</button>
+    <div class="fleet-user"><span data-user-email>Guest</span><button data-signout>Sign out</button></div>
+  </div>
+</header>
+<div class="fleet-content">
 <div class="metric-grid">
-<div class="metric"><label>Total revenue</label><strong id="mRevenue">$0</strong></div>
-<div class="metric"><label>Expenses</label><strong id="mExpenses" class="red">$0</strong></div>
+<div class="metric"><label>This month revenue</label><strong id="mRevenue">$0</strong></div>
+<div class="metric"><label>Total costs</label><strong id="mCosts" class="red">$0</strong></div>
 <div class="metric"><label>Net profit</label><strong id="mProfit" class="green">$0</strong></div>
-<div class="metric"><label>True RPM</label><strong id="mRpm" class="accent">$0.00</strong></div>
+<div class="metric"><label>True cost / mile</label><strong id="mCpm" class="accent">$0.00</strong></div>
 <div class="metric"><label>Unpaid revenue</label><strong id="mUnpaid">$0</strong></div>
 </div>
 <div class="fleet-grid-2">
-<section class="fleet-card"><div class="fleet-card-head"><div><h2>Recent loads</h2><p>Revenue, expenses and real load profit.</p></div><a class="fleet-btn secondary" href="/app/loads/">All loads</a></div>
-<div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Load</th><th>Broker</th><th>Route</th><th>Status</th><th>Revenue</th><th>Profit</th><th>RPM</th></tr></thead><tbody id="recentLoads"></tbody></table></div>
-<div class="empty-state" id="recentEmpty"><b>No loads yet.</b>Analyze a Rate Con or add your first load manually.</div></section>
-<section class="fleet-card"><div class="fleet-card-head"><div><h2>Business snapshot</h2><p>What needs attention right now.</p></div></div><div class="fleet-card-body">
-<div class="kpi-list"><div class="kpi-row"><span>Loads tracked</span><b id="kLoads">0</b></div><div class="kpi-row"><span>Miles tracked</span><b id="kMiles">0</b></div><div class="kpi-row"><span>Open loads / AR</span><b id="kOpen">0</b></div><div class="kpi-row"><span>Average profit / load</span><b id="kAvgProfit">$0</b></div></div>
-<div class="quick-actions" style="margin-top:16px"><a href="/#check">↗ Analyze a Rate Con</a><a href="/app/expenses/">＋ Add an expense</a><a href="/app/brokers/">◎ Broker scorecard</a><a href="/app/documents/">□ Document tracker</a></div>
-</div></section></div>
-<div id="loadModal" class="modal-backdrop"><div class="fleet-modal"><div class="fleet-modal-head"><h2>Add load</h2><button class="icon-btn" id="closeModal">×</button></div><div class="fleet-modal-body"><form id="loadForm">
-<div class="fleet-form-grid"><div class="fleet-field"><label>Load #</label><input name="loadNumber"></div><div class="fleet-field"><label>Broker</label><input name="broker"></div><div class="fleet-field"><label>Origin</label><input name="origin" placeholder="Chicago, IL"></div><div class="fleet-field"><label>Destination</label><input name="destination" placeholder="Dallas, TX"></div><div class="fleet-field"><label>Revenue ($)</label><input name="revenue" type="number" min="0" step="0.01"></div><div class="fleet-field"><label>Status</label><select name="status"><option>Booked</option><option>In Transit</option><option>Delivered</option><option>Invoiced</option><option>Paid</option></select></div><div class="fleet-field"><label>Loaded miles</label><input name="loadedMiles" type="number" min="0"></div><div class="fleet-field"><label>Deadhead miles</label><input name="deadheadMiles" type="number" min="0"></div></div>
-<div class="fleet-form-actions"><button type="button" class="fleet-btn secondary" id="cancelModal">Cancel</button><button class="fleet-btn">Save load</button></div></form></div></div></div></div>
-</main></div><script>
-const F=RateConFleet,modal=document.getElementById("loadModal");const open=()=>modal.classList.add("show"),close=()=>modal.classList.remove("show");
-primaryAction.onclick=open;closeModal.onclick=cancelModal.onclick=close;
-loadForm.onsubmit=e=>{e.preventDefault();F.addLoad(Object.fromEntries(new FormData(e.currentTarget).entries()));e.currentTarget.reset();close();render();};
-function render(){const data=F.read(),m=F.metrics(data);mRevenue.textContent=F.money(m.revenue);mExpenses.textContent=F.money(m.expenses);mProfit.textContent=F.money(m.profit);mRpm.textContent=F.decimalMoney(m.rpm);mUnpaid.textContent=F.money(m.unpaid);kLoads.textContent=m.loads;kMiles.textContent=Math.round(m.miles).toLocaleString();kOpen.textContent=data.loads.filter(x=>x.status!=="Paid").length;kAvgProfit.textContent=F.money(m.loads?m.profit/m.loads:0);
-const rows=data.loads.slice(0,8);recentEmpty.style.display=rows.length?"none":"block";recentLoads.innerHTML=rows.map(l=>{const profit=F.loadProfit(l,data),miles=F.loadMiles(l),rpm=miles?l.revenue/miles:0;return `<tr><td>${l.loadNumber||"—"}</td><td>${l.broker||"—"}</td><td class="route">${l.origin||"?"} → ${l.destination||"?"}</td><td><span class="status">${l.status}</span></td><td class="money">${F.money(l.revenue)}</td><td class="profit">${F.money(profit)}</td><td>${F.decimalMoney(rpm)}</td></tr>`}).join("");window.rateconTrack?.("fleet_dashboard_view",{load_count:m.loads});}render();</script></body></html>
+<section class="fleet-card">
+<div class="fleet-card-head"><div><h2>Recent loads</h2><p>True profit includes direct load expenses and allocated monthly truck fixed cost.</p></div><a class="fleet-btn secondary" href="/app/loads/">All loads</a></div>
+<div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Load</th><th>Truck</th><th>Broker</th><th>Route</th><th>Status</th><th>Revenue</th><th>True profit</th></tr></thead><tbody id="recentLoads"></tbody></table></div>
+<div class="empty-state" id="recentEmpty"><b>No loads yet.</b>Analyze a Rate Con or add your first load.</div>
+</section>
+<section class="fleet-card">
+<div class="fleet-card-head"><div><h2>This month</h2><p>Your operating picture right now.</p></div></div>
+<div class="fleet-card-body"><div class="kpi-list">
+<div class="kpi-row"><span>Loads tracked</span><b id="kLoads">0</b></div>
+<div class="kpi-row"><span>Miles tracked</span><b id="kMiles">0</b></div>
+<div class="kpi-row"><span>Variable expenses</span><b id="kVariable">$0</b></div>
+<div class="kpi-row"><span>Fixed truck costs</span><b id="kFixed">$0</b></div>
+<div class="kpi-row"><span>Revenue / mile</span><b id="kRpm">$0.00</b></div>
+</div>
+<div class="quick-actions" style="margin-top:16px">
+<a href="/#check">↗ Analyze a Rate Con</a><a href="/app/receivables/">$ Receivables</a><a href="/app/trucks/">▣ Truck costs</a><a href="/app/expenses/">＋ Add expense</a>
+</div></div></section>
+</div></div>
+</main></div>
+<script src="/assets/app-shell.js"></script>
+<script>
+window.addEventListener("ratecon:appready", async()=>{ try{ 
+primaryAction.textContent="Add Load";primaryAction.onclick=()=>location.href="/app/loads/?new=1";
+const data=await RateConStore.read(),m=RateConStore.currentMonthMetrics(data);
+mRevenue.textContent=RateConStore.money(m.revenue);mCosts.textContent=RateConStore.money(m.totalCosts);mProfit.textContent=RateConStore.money(m.profit);mCpm.textContent=RateConStore.money2(m.cpm);mUnpaid.textContent=RateConStore.money(m.unpaid);
+kLoads.textContent=m.loads;kMiles.textContent=Math.round(m.miles).toLocaleString();kVariable.textContent=RateConStore.money(m.variableExpenses);kFixed.textContent=RateConStore.money(m.fixedCosts);kRpm.textContent=RateConStore.money2(m.rpm);
+const rows=data.loads.slice(0,8);recentEmpty.style.display=rows.length?"none":"block";
+recentLoads.innerHTML=rows.map(l=>{const t=data.trucks.find(x=>x.id===l.truckId);return `<tr><td>${l.loadNumber||"—"}</td><td>${t?.unitNumber||"—"}</td><td>${l.broker||"—"}</td><td class="route">${l.origin||"?"} → ${l.destination||"?"}</td><td><span class="status">${l.status}</span></td><td class="money">${RateConStore.money(l.revenue)}</td><td class="profit">${RateConStore.money(RateConStore.loadTrueProfit(l,data))}</td></tr>`}).join("");
+window.rateconTrack?.("fleet_dashboard_view",{mode:RateConStore.getMode(),load_count:data.loads.length});
+ }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
+</script>
+</body></html>
