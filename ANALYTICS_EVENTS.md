@@ -12,3 +12,12 @@ Useful funnel:
 Visitors -> upload_selected -> analysis_started -> analysis_success
 
 No filename or document contents are sent to Google Analytics.
+
+
+## Owner-operator dashboard events
+- `ratecon_save_load_click`
+- `fleet_dashboard_view`
+- `fleet_load_created`
+- `fleet_expense_added`
+- `fleet_status_changed`
+- `fleet_document_changed`

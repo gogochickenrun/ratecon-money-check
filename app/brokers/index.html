@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Broker Scorecard | RateConRisk</title><meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="/assets/fleet.css">
+<script src="/assets/analytics.js"></script><script src="/assets/fleet.js"></script>
+</head><body class="fleet-app"><div class="fleet-layout">
+<aside class="fleet-sidebar"><a class="fleet-brand" href="/">RateCon<span>Risk</span></a><nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/brokers/" class="active">Brokers</a><a href="/app/documents/" class="">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
+<div class="fleet-sidebar-bottom">Owner-operator business tools.<br>V1 stores data on this browser only.</div></aside>
+<main class="fleet-main"><header class="fleet-topbar"><h1>Broker Scorecard</h1><div class="fleet-top-actions"><a class="fleet-btn secondary" href="/#check">Check Rate Con</a><button class="fleet-btn" id="primaryAction" type="button">Add Load</button></div></header>
+<div class="fleet-content"><div class="fleet-note">MVP note: business data is stored only in this browser for now. Account sync and cloud storage come after we validate repeat use.</div>
+<section class="fleet-card"><div class="fleet-card-head"><div><h2>Broker scorecard</h2><p>See which brokers actually produce revenue, profit and unpaid exposure.</p></div></div><div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Broker</th><th>Loads</th><th>Revenue</th><th>True RPM</th><th>Profit</th><th>Unpaid</th><th>Avg risk</th></tr></thead><tbody id="brokerRows"></tbody></table></div><div class="empty-state" id="emptyBrokers"><b>No broker history yet.</b>Add loads or save an analyzed Rate Con.</div></section></div>
+</main></div><script>
+const F=RateConFleet;primaryAction.textContent="Analyze Rate Con";primaryAction.onclick=()=>location.href="/#check";
+function render(){const rows=F.brokers();emptyBrokers.style.display=rows.length?"none":"block";brokerRows.innerHTML=rows.map(b=>{const riskClass=b.avgRisk>=70?"risk-high":b.avgRisk>=40?"risk-mid":"risk-low";return `<tr><td class="broker-name">${b.broker}</td><td>${b.loads}</td><td class="money">${F.money(b.revenue)}</td><td>${F.decimalMoney(b.rpm)}</td><td class="profit">${F.money(b.profit)}</td><td>${F.money(b.unpaid)}</td><td class="${riskClass}">${Math.round(b.avgRisk)}/100</td></tr>`}).join("")}render();</script></body></html>

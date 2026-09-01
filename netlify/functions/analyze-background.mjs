@@ -7,6 +7,30 @@ const reportSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
+    load_details: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        load_number: { type: "string" },
+        broker: { type: "string" },
+        origin: { type: "string" },
+        destination: { type: "string" },
+        pickup_date: { type: "string" },
+        delivery_date: { type: "string" },
+        base_pay_amount: { type: "number", minimum: 0 },
+        loaded_miles: { type: "number", minimum: 0 }
+      },
+      required: [
+        "load_number",
+        "broker",
+        "origin",
+        "destination",
+        "pickup_date",
+        "delivery_date",
+        "base_pay_amount",
+        "loaded_miles"
+      ]
+    },
     summary: {
       type: "object",
       additionalProperties: false,
@@ -131,6 +155,7 @@ const reportSchema = {
     }
   },
   required: [
+    "load_details",
     "summary",
     "deductions",
     "extra_pay",
@@ -188,6 +213,8 @@ Rules:
 14. Missing-or-unclear items must be genuinely missing or ambiguous. If the document explicitly states pickup and delivery check calls, do not call the frequency unclear merely because no additional periodic schedule is listed.
 15. Preserve uncertainty. If the document says "may result in", "subject to", "can be deducted", or similar, keep that uncertainty in the output.
 16. questions_for_broker must ask only about information that is genuinely unanswered in the document AND could materially affect payment or eligibility. Do not ask whether extra check-call times exist when the document already states the required check calls, unless the document itself indicates another schedule. It is acceptable to return fewer than 3 questions.
+17. load_details is used to create a load record for the carrier. Extract load number, broker/company name, origin, destination, pickup date, delivery date, agreed base/total pay as a numeric dollar amount, and loaded miles when explicitly stated.
+18. For load_details strings that are not found, return an empty string. For numeric fields not found, return 0. Never infer miles, dates, locations, broker names, or dollar amounts.
 `;
 
 function extractText(interaction) {

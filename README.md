@@ -224,3 +224,19 @@ After deploying V3:
 The relay can exceed Netlify's synchronous function limit. V4 uses a Background Function plus temporary Netlify Blobs and browser polling.
 
 Flow: Browser → Background Function → CodexCN → temporary result → polling → render.
+
+
+## V5 — Owner-Operator Business Dashboard
+
+New pages:
+- `/app/` Dashboard
+- `/app/loads/`
+- `/app/expenses/`
+- `/app/brokers/`
+- `/app/documents/`
+
+Rate Con analysis now extracts load metadata and includes a **Save as Load** action.
+
+The V1 business dashboard calculates revenue, expenses, profit and true RPM with normal code, not the language model.
+
+Current MVP storage is browser-local. Before production-grade financial use, add authentication, cloud database and backups.

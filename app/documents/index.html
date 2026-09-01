@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Documents | RateConRisk</title><meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="/assets/fleet.css">
+<script src="/assets/analytics.js"></script><script src="/assets/fleet.js"></script>
+</head><body class="fleet-app"><div class="fleet-layout">
+<aside class="fleet-sidebar"><a class="fleet-brand" href="/">RateCon<span>Risk</span></a><nav class="fleet-nav"><a href="/app/" class="">Dashboard</a><a href="/app/loads/" class="">Loads</a><a href="/app/expenses/" class="">Expenses</a><a href="/app/brokers/" class="">Brokers</a><a href="/app/documents/" class="active">Documents</a><a href="/#check" class="">Analyze Rate Con</a></nav>
+<div class="fleet-sidebar-bottom">Owner-operator business tools.<br>V1 stores data on this browser only.</div></aside>
+<main class="fleet-main"><header class="fleet-topbar"><h1>Documents</h1><div class="fleet-top-actions"><a class="fleet-btn secondary" href="/#check">Check Rate Con</a><button class="fleet-btn" id="primaryAction" type="button">Add Load</button></div></header>
+<div class="fleet-content"><div class="fleet-note">MVP note: business data is stored only in this browser for now. Account sync and cloud storage come after we validate repeat use.</div>
+<section class="fleet-card"><div class="fleet-card-head"><div><h2>Document tracker</h2><p>Keep each load’s paperwork status in one place.</p></div></div><div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Load</th><th>Broker</th><th>Route</th><th>Documents</th></tr></thead><tbody id="docRows"></tbody></table></div><div class="empty-state" id="emptyDocs"><b>No loads yet.</b>Add a load first, then track Rate Con, BOL, POD and invoice paperwork.</div></section></div>
+</main></div><script>
+const F=RateConFleet;primaryAction.textContent="Add Load";primaryAction.onclick=()=>location.href="/app/loads/";
+function render(){const data=F.read();emptyDocs.style.display=data.loads.length?"none":"block";const fields=[["rateCon","Rate Con"],["bol","BOL"],["pod","POD"],["invoice","Invoice"],["lumper","Lumper"]];docRows.innerHTML=data.loads.map(l=>`<tr><td>${l.loadNumber||"—"}</td><td>${l.broker||"—"}</td><td class="route">${l.origin||"?"} → ${l.destination||"?"}</td><td><div class="doc-grid">${fields.map(([k,label])=>`<label class="doc-check"><input type="checkbox" data-load="${l.id}" data-doc="${k}" ${l.documents?.[k]?"checked":""}>${label}</label>`).join("")}</div></td></tr>`).join("");document.querySelectorAll("[data-doc]").forEach(el=>el.onchange=()=>{F.updateLoad(el.dataset.load,{documents:{[el.dataset.doc]:el.checked}});window.rateconTrack?.("fleet_document_changed",{document:el.dataset.doc,checked:el.checked})})}render();</script></body></html>
