@@ -198,3 +198,29 @@ Expected:
 Then test a small Rate Confirmation PDF.
 
 If analysis still fails, the page will now show the real provider error.
+
+
+## V3 — actual frontend JSON parsing fix
+
+Important correction:
+The production homepage contains its upload logic inline inside `index.html`.
+V2 patched `assets/app.js`, but the homepage did not use that file for the upload request.
+
+V3 patches the real inline code:
+- reads the response as text first
+- parses JSON safely
+- shows HTTP status + a short response preview when Netlify/provider returns HTML
+- adds no-cache headers for HTML so fixes are picked up quickly
+
+After deploying V3:
+1. Open `https://rateconrisk.com/api/analyze` and confirm the JSON health response.
+2. Reload `https://rateconrisk.com`.
+3. Upload the Rate Con again.
+4. Copy the NEW full error message if analysis still fails.
+
+
+## V4 — Background analysis architecture
+
+The relay can exceed Netlify's synchronous function limit. V4 uses a Background Function plus temporary Netlify Blobs and browser polling.
+
+Flow: Browser → Background Function → CodexCN → temporary result → polling → render.

@@ -1,0 +1,4 @@
+import { getStore } from "@netlify/blobs";
+function json(body,status=200){return new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}})}
+export default async(request)=>{if(request.method!=="GET")return json({error:"Method not allowed."},405);const url=new URL(request.url);const jobId=String(url.searchParams.get("job")||"").trim();if(!jobId||!/^[a-zA-Z0-9_-]{8,100}$/.test(jobId))return json({error:"Invalid job id."},400);const store=getStore({name:"ratecon-analysis-jobs",consistency:"strong"});const record=await store.get(jobId,{type:"json"});if(!record)return json({status:"queued"});const ts=Number(record.updatedAt||record.createdAt||0);if(ts&&Date.now()-ts>60*60*1000){await store.delete(jobId);return json({status:"expired",error:"This analysis result has expired. Please upload again."},410)}return json(record)};
+export const config={path:"/api/analyze-status"};
