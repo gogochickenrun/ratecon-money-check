@@ -174,3 +174,27 @@ Preserved:
 - existing SEO pages
 - sitemap / robots
 - existing GA4 and RateConRisk custom events
+
+
+## CodexCN V2 diagnostics
+
+This build fixes the raw `Unexpected token '<'` error.
+
+Changes:
+- `/api/analyze` is now owned directly by the Netlify Function (no redirect rule).
+- `GET /api/analyze` returns a JSON health check.
+- The provider request aborts at 55 seconds so Netlify does not return its own HTML timeout page.
+- The browser no longer blindly calls `response.json()`.
+- Provider HTML/error pages are converted to readable JSON errors and logged.
+
+After deployment, first open:
+
+`https://rateconrisk.com/api/analyze`
+
+Expected:
+
+`{"ok":true,"service":"RateConRisk analyze","provider":"codexcn",...}`
+
+Then test a small Rate Confirmation PDF.
+
+If analysis still fails, the page will now show the real provider error.

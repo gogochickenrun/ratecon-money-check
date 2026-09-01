@@ -207,6 +207,7 @@ function extractText(interaction) {
 }
 
 
+
 function cleanBase64(dataUrl) {
   if (typeof dataUrl !== "string") return "";
   const comma = dataUrl.indexOf(",");
@@ -230,37 +231,45 @@ function extractOutputText(data) {
   return chunks.join("").trim();
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Method not allowed." })
-    };
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store"
+    }
+  });
+}
+
+export default async (request) => {
+  // Opening /api/analyze in a browser now gives a JSON health response.
+  if (request.method === "GET") {
+    return json({
+      ok: true,
+      service: "RateConRisk analyze",
+      provider: "codexcn",
+      model: MODEL
+    });
+  }
+
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed." }, 405);
   }
 
   const apiKey = process.env.CODEXCN_API_KEY;
   if (!apiKey) {
     console.error("[RateConRisk] CODEXCN_API_KEY missing");
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "Service is not configured yet." })
-    };
+    return json({ error: "CODEXCN_API_KEY is not configured in Netlify." }, 500);
   }
 
   try {
-    const body = JSON.parse(event.body || "{}");
+    const body = await request.json();
     const filename = String(body.filename || "");
     const mimeType = String(body.mimeType || "").toLowerCase();
     const base64 = cleanBase64(body.fileData);
 
     if (!filename || !base64) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Missing file." })
-      };
+      return json({ error: "Missing file." }, 400);
     }
 
     const isPdf =
@@ -271,20 +280,12 @@ export const handler = async (event) => {
     const isImage = allowedImages.has(mimeType);
 
     if (!isPdf && !isImage) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Please upload a PDF, JPG, PNG, or WebP file." })
-      };
+      return json({ error: "Please upload a PDF, JPG, PNG, or WebP file." }, 400);
     }
 
     const approxBytes = Math.floor(base64.length * 0.75);
     if (approxBytes > 4 * 1024 * 1024) {
-      return {
-        statusCode: 413,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "File is too large. Please upload a file under 4 MB." })
-      };
+      return json({ error: "File is too large. Please upload a file under 4 MB." }, 413);
     }
 
     const fileContent = isPdf
@@ -326,86 +327,101 @@ export const handler = async (event) => {
       store: false
     };
 
-    const response = await fetch(`${BASE_URL}/responses`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(payload)
+    console.log("[RateConRisk] provider request starting", {
+      model: MODEL,
+      fileType: isPdf ? "pdf" : mimeType,
+      approxBytes
     });
 
+    let response;
+    try {
+      // Netlify synchronous Functions currently have a 60s execution limit.
+      // Abort ourselves first so the user gets JSON instead of a Netlify HTML timeout page.
+      response = await fetch(`${BASE_URL}/responses`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(55000)
+      });
+    } catch (err) {
+      if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+        console.error("[RateConRisk] provider timed out");
+        return json({
+          error: "The analysis provider took too long to respond (55s timeout). Please try again."
+        }, 504);
+      }
+
+      console.error("[RateConRisk] provider network error", err);
+      return json({
+        error: `Could not reach the analysis provider: ${err?.message || "network error"}`
+      }, 502);
+    }
+
     const rawText = await response.text();
-    let data = null;
+    let data;
 
     try {
       data = JSON.parse(rawText);
     } catch {
-      console.error("[RateConRisk] Provider returned non-JSON", {
+      console.error("[RateConRisk] provider returned non-JSON", {
         status: response.status,
-        body: rawText.slice(0, 1000)
+        contentType: response.headers.get("content-type"),
+        body: rawText.slice(0, 800)
       });
-      return {
-        statusCode: 502,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: `Analysis provider returned HTTP ${response.status} with a non-JSON response.`
-        })
-      };
+
+      return json({
+        error:
+          `Provider returned HTTP ${response.status} instead of JSON. ` +
+          `This usually means the relay rejected this request format or returned an upstream error page.`,
+        provider_preview: rawText.slice(0, 160).replace(/\s+/g, " ")
+      }, 502);
     }
 
     if (!response.ok) {
       const providerMessage =
         data?.error?.message ||
         data?.message ||
-        `Analysis provider returned HTTP ${response.status}.`;
+        `Provider returned HTTP ${response.status}.`;
 
-      console.error("[RateConRisk] Provider error", {
+      console.error("[RateConRisk] provider error", {
         status: response.status,
         model: MODEL,
         message: providerMessage
       });
 
-      return {
-        statusCode: response.status >= 400 && response.status < 600 ? response.status : 502,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: providerMessage })
-      };
+      return json({
+        error: providerMessage,
+        provider_status: response.status
+      }, 502);
     }
 
     const outputText = extractOutputText(data);
 
     if (!outputText) {
-      console.error("[RateConRisk] No text output", {
-        model: MODEL,
-        providerStatus: data?.status,
+      console.error("[RateConRisk] empty output", {
+        status: data?.status,
         incompleteDetails: data?.incomplete_details,
-        body: JSON.stringify(data).slice(0, 1500)
+        body: JSON.stringify(data).slice(0, 1200)
       });
 
-      return {
-        statusCode: 502,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: data?.incomplete_details?.reason
-            ? `Analysis was incomplete: ${data.incomplete_details.reason}.`
-            : "No usable result was returned."
-        })
-      };
+      return json({
+        error: data?.incomplete_details?.reason
+          ? `Analysis was incomplete: ${data.incomplete_details.reason}.`
+          : "Provider returned no usable text."
+      }, 502);
     }
 
     let parsed;
     try {
       parsed = JSON.parse(outputText);
     } catch {
-      console.error("[RateConRisk] Invalid JSON output", outputText.slice(0, 2000));
-      return {
-        statusCode: 502,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          error: "The analysis result could not be parsed. Please try again."
-        })
-      };
+      console.error("[RateConRisk] model returned invalid JSON", outputText.slice(0, 1200));
+      return json({
+        error: "The model returned an invalid structured result. Please try again."
+      }, 502);
     }
 
     console.log("[RateConRisk] analysis success", {
@@ -416,20 +432,15 @@ export const handler = async (event) => {
       outputTokens: data?.usage?.output_tokens ?? null
     });
 
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store"
-      },
-      body: JSON.stringify(parsed)
-    };
+    return json(parsed);
   } catch (err) {
-    console.error("[RateConRisk] Unexpected error", err);
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: err?.message || "Unexpected error." })
-    };
+    console.error("[RateConRisk] unexpected error", err);
+    return json({
+      error: err?.message || "Unexpected server error."
+    }, 500);
   }
+};
+
+export const config = {
+  path: "/api/analyze"
 };
