@@ -28,7 +28,8 @@
 (async()=>{
   const state=await RateConCloud.init();
   const msg=document.getElementById("message");
-  const next=new URLSearchParams(location.search).get("next")||"/app/";
+  const rawNext=new URLSearchParams(location.search).get("next")||"/app/";
+  const next=(rawNext.startsWith("/app")&&!rawNext.startsWith("//"))?rawNext:"/app/";
 
   if(!state.configured){
     msg.className="auth-message show bad";

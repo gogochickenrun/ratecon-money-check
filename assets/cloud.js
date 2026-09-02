@@ -61,7 +61,8 @@
   async function sendMagicLink(email) {
     await init();
     if (!client) throw new Error("Cloud login is not configured yet.");
-    const next = new URLSearchParams(location.search).get("next") || "/app/";
+    const rawNext = new URLSearchParams(location.search).get("next") || "/app/";
+    const next = (rawNext.startsWith("/app") && !rawNext.startsWith("//")) ? rawNext : "/app/";
     const redirect = `${location.origin}/app/login/?next=${encodeURIComponent(next)}`;
     const { error } = await client.auth.signInWithOtp({
       email,

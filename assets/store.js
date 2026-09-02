@@ -13,6 +13,17 @@
     style:"currency", currency:"USD", minimumFractionDigits:2, maximumFractionDigits:2
   }).format(num(v));
 
+  const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
+  }[c]));
+
+  const safeInternalPath = (value, fallback="/app/") => {
+    const s = String(value || "");
+    if (!s.startsWith("/") || s.startsWith("//")) return fallback;
+    if (!s.startsWith("/app")) return fallback;
+    return s;
+  };
+
   function localRead() {
     try {
       const raw = JSON.parse(localStorage.getItem(LOCAL_KEY) || "null");
@@ -188,24 +199,49 @@
   }
 
   async function migrateLocalIfNeeded() {
-    if (mode !== "cloud") return;
-    const local = localRead();
-    if (!local.loads.length && !local.expenses.length && !local.trucks.length) return;
+    if (mode !== "cloud" || !user?.id) return;
 
-    const { count } = await db.from("loads").select("*", { count:"exact", head:true });
-    if ((count || 0) > 0) return;
+    const markerKey = `${LOCAL_KEY}_migrated_${user.id}`;
+    if (localStorage.getItem(markerKey)) return;
+
+    const local = localRead();
+    if (!local.loads.length && !local.expenses.length && !local.trucks.length) {
+      localStorage.setItem(markerKey, new Date().toISOString());
+      return;
+    }
+
+    const [
+      { count: loadCount, error: loadCountError },
+      { count: truckCount, error: truckCountError },
+      { count: expenseCount, error: expenseCountError }
+    ] = await Promise.all([
+      db.from("loads").select("*", { count:"exact", head:true }),
+      db.from("trucks").select("*", { count:"exact", head:true }),
+      db.from("expenses").select("*", { count:"exact", head:true })
+    ]);
+
+    const countError = loadCountError || truckCountError || expenseCountError;
+    if (countError) throw countError;
+
+    // Only auto-migrate into a completely empty cloud account.
+    if ((loadCount || 0) > 0 || (truckCount || 0) > 0 || (expenseCount || 0) > 0) {
+      localStorage.setItem(markerKey, new Date().toISOString());
+      return;
+    }
 
     const truckMap = new Map();
     for (const t of local.trucks || []) {
       const { data, error } = await db.from("trucks").insert(toTruckRow(t)).select().single();
-      if (!error && data) truckMap.set(t.id, data.id);
+      if (error) throw error;
+      if (data) truckMap.set(t.id, data.id);
     }
 
     const loadMap = new Map();
     for (const l of local.loads || []) {
       const row = toLoadRow({ ...l, truckId: truckMap.get(l.truckId) || null });
       const { data, error } = await db.from("loads").insert(row).select().single();
-      if (!error && data) loadMap.set(l.id, data.id);
+      if (error) throw error;
+      if (data) loadMap.set(l.id, data.id);
     }
 
     for (const e of local.expenses || []) {
@@ -214,13 +250,15 @@
         loadId: loadMap.get(e.loadId) || null,
         truckId: truckMap.get(e.truckId) || null
       });
-      await db.from("expenses").insert(row);
+      const { error } = await db.from("expenses").insert(row);
+      if (error) throw error;
     }
 
-    localStorage.setItem(`${LOCAL_KEY}_migrated`, new Date().toISOString());
+    localStorage.setItem(markerKey, new Date().toISOString());
     window.rateconTrack?.("fleet_local_data_migrated", {
       loads: local.loads.length,
-      expenses: local.expenses.length
+      expenses: local.expenses.length,
+      trucks: local.trucks.length
     });
   }
 
@@ -317,16 +355,32 @@
   }
 
   async function addExpense(e) {
+    let normalized = { ...e };
+
+    // A load is the source of truth for truck assignment.
+    // This prevents one expense from being counted against two trucks.
+    if (normalized.loadId) {
+      const current = await read();
+      const linkedLoad = current.loads.find(l => l.id === normalized.loadId);
+      if (linkedLoad) normalized.truckId = linkedLoad.truckId || "";
+    }
+
     if (mode !== "cloud") {
       const data=localRead();
-      const record=mapExpense({id:localId("exp"),...e,createdAt:new Date().toISOString()});
+      const record=mapExpense({
+        id:localId("exp"),
+        ...normalized,
+        date: normalized.date || new Date().toISOString().slice(0,10),
+        createdAt:new Date().toISOString()
+      });
       data.expenses.unshift(record);localWrite(data);
       window.rateconTrack?.("fleet_expense_added",{category:record.category});
       return record;
     }
-    const { data, error } = await db.from("expenses").insert(toExpenseRow(e)).select().single();
+
+    const { data, error } = await db.from("expenses").insert(toExpenseRow(normalized)).select().single();
     if (error) throw error;
-    window.rateconTrack?.("fleet_expense_added",{category:e.category});
+    window.rateconTrack?.("fleet_expense_added",{category:normalized.category});
     return mapExpense(data);
   }
 
@@ -346,8 +400,20 @@
     return num(t.monthlyTruckPayment)+num(t.monthlyInsurance)+num(t.monthlyPermits)+num(t.monthlyOtherFixed);
   }
 
-  function monthKey(date=new Date()) {
-    const d = typeof date==="string" ? new Date(`${date}T00:00:00`) : date;
+  function monthKey(value=new Date()) {
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return "";
+      return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}`;
+    }
+
+    const s = String(value || "").trim();
+    if (!s) return "";
+
+    // ISO/date inputs can be read directly without appending another time suffix.
+    const isoMatch = s.match(/^(\d{4})-(\d{2})(?:-\d{2})?/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}`;
+
+    const d = new Date(s);
     if (Number.isNaN(d.getTime())) return "";
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   }
@@ -368,8 +434,8 @@
     };
   }
 
-  function truckMetrics(truck, data) {
-    const mk=monthKey(new Date());
+  function truckMetricsForMonth(truck, data, targetMonth) {
+    const mk = targetMonth || monthKey(new Date());
     const loads=data.loads.filter(l=>l.truckId===truck.id && monthKey(l.pickupDate||l.createdAt)===mk);
     const loadIds=new Set(loads.map(l=>l.id));
     const expenses=data.expenses.filter(e =>
@@ -382,10 +448,14 @@
     const fixed=truckFixedMonthly(truck);
     const costs=variable+fixed;
     return {
-      loads:loads.length,revenue,miles,variable,fixed,costs,
+      month:mk,loads:loads.length,revenue,miles,variable,fixed,costs,
       profit:revenue-costs,cpm:miles?costs/miles:0,rpm:miles?revenue/miles:0,
       fixedCpm:miles?fixed/miles:0
     };
+  }
+
+  function truckMetrics(truck, data) {
+    return truckMetricsForMonth(truck, data, monthKey(new Date()));
   }
 
   function loadTrueProfit(load, data) {
@@ -393,10 +463,13 @@
     const miles=loadMiles(load);
     const truck=data.trucks.find(t=>t.id===load.truckId);
     let allocatedFixed=0;
+
     if(truck && miles){
-      const tm=truckMetrics(truck,data);
+      const loadMonth = monthKey(load.pickupDate || load.createdAt);
+      const tm=truckMetricsForMonth(truck,data,loadMonth);
       allocatedFixed=miles*(tm.fixedCpm||0);
     }
+
     return num(load.revenue)-direct-allocatedFixed;
   }
 
@@ -420,7 +493,12 @@
   }
 
   function receivables(data) {
-    const open=data.loads.filter(l=>l.status!=="Paid" && num(l.revenue)-num(l.amountPaid)>0);
+    const open=data.loads.filter(l => {
+      const invoiced = l.status === "Invoiced" || Boolean(l.invoiceDate) || Boolean(l.invoiceNumber);
+      const balance = num(l.revenue) - num(l.amountPaid);
+      return invoiced && l.status !== "Paid" && balance > 0;
+    });
+
     const total=open.reduce((s,l)=>s+Math.max(0,num(l.revenue)-num(l.amountPaid)),0);
     const overdue=open.filter(l=>l.dueDate && new Date(`${l.dueDate}T23:59:59`) < new Date());
     const overdueTotal=overdue.reduce((s,l)=>s+Math.max(0,num(l.revenue)-num(l.amountPaid)),0);
@@ -463,6 +541,92 @@
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   }
 
+
+  function truckFingerprint(t) {
+    return [
+      String(t.unitNumber || "").trim().toLowerCase(),
+      String(t.nickname || "").trim().toLowerCase(),
+      String(t.year || "").trim(),
+      String(t.make || "").trim().toLowerCase(),
+      String(t.model || "").trim().toLowerCase(),
+      num(t.monthlyTruckPayment).toFixed(2),
+      num(t.monthlyInsurance).toFixed(2),
+      num(t.monthlyPermits).toFixed(2),
+      num(t.monthlyOtherFixed).toFixed(2)
+    ].join("|");
+  }
+
+  async function truckDuplicateCount() {
+    const data = await read();
+    const seen = new Set();
+    let duplicates = 0;
+    for (const t of data.trucks) {
+      const fp = truckFingerprint(t);
+      if (seen.has(fp)) duplicates++;
+      else seen.add(fp);
+    }
+    return duplicates;
+  }
+
+  async function dedupeTrucks() {
+    const data = await read();
+    const keepByFingerprint = new Map();
+    const duplicateToKeep = new Map();
+
+    // read() returns newest first; keep the newest exact copy.
+    for (const t of data.trucks) {
+      const fp = truckFingerprint(t);
+      if (!keepByFingerprint.has(fp)) keepByFingerprint.set(fp, t);
+      else duplicateToKeep.set(t.id, keepByFingerprint.get(fp).id);
+    }
+
+    if (!duplicateToKeep.size) return 0;
+
+    if (mode !== "cloud") {
+      const local = localRead();
+
+      local.loads = local.loads.map(l => ({
+        ...l,
+        truckId: duplicateToKeep.get(l.truckId) || l.truckId
+      }));
+
+      local.expenses = local.expenses.map(e => ({
+        ...e,
+        truckId: duplicateToKeep.get(e.truckId) || e.truckId
+      }));
+
+      local.trucks = local.trucks.filter(t => !duplicateToKeep.has(t.id));
+      localWrite(local);
+      return duplicateToKeep.size;
+    }
+
+    for (const [duplicateId, keepId] of duplicateToKeep.entries()) {
+      const { error: loadError } = await db
+        .from("loads")
+        .update({ truck_id: keepId })
+        .eq("truck_id", duplicateId);
+      if (loadError) throw loadError;
+
+      const { error: expenseError } = await db
+        .from("expenses")
+        .update({ truck_id: keepId })
+        .eq("truck_id", duplicateId);
+      if (expenseError) throw expenseError;
+
+      const { error: deleteError } = await db
+        .from("trucks")
+        .delete()
+        .eq("id", duplicateId);
+      if (deleteError) throw deleteError;
+    }
+
+    window.rateconTrack?.("fleet_truck_duplicates_cleaned", {
+      removed: duplicateToKeep.size
+    });
+
+    return duplicateToKeep.size;
+  }
+
   function getMode(){return mode;}
   function getUser(){return user;}
 
@@ -470,6 +634,7 @@
     init,read,addTruck,updateTruck,removeTruck,addLoad,updateLoad,removeLoad,
     addExpense,removeExpense,loadMiles,loadDirectExpenses,truckFixedMonthly,
     currentMonthMetrics,truckMetrics,loadTrueProfit,daysToPay,daysOutstanding,
-    receivables,brokers,exportLoadsCSV,money,money2,num,getMode,getUser
+    receivables,brokers,exportLoadsCSV,money,money2,num,esc,safeInternalPath,
+    truckDuplicateCount,dedupeTrucks,getMode,getUser
   };
 })();

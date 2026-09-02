@@ -25,7 +25,7 @@
 </header>
 <div class="fleet-content">
 <section class="fleet-card">
-<div class="fleet-card-head"><div><h2>Trucks & fixed costs</h2><p>Monthly truck payment, insurance and fixed overhead drive your real cost per mile.</p></div></div>
+<div class="fleet-card-head"><div><h2>Trucks & fixed costs</h2><p>Monthly truck payment, insurance and fixed overhead drive your real cost per mile.</p></div><button class="fleet-btn secondary" id="cleanupDuplicates" style="display:none">Clean duplicates</button></div>
 <div class="fleet-table-wrap"><table class="fleet-table"><thead><tr><th>Truck</th><th>This month loads</th><th>Miles</th><th>Revenue</th><th>Variable costs</th><th>Fixed costs</th><th>True CPM</th><th>Profit</th><th></th></tr></thead><tbody id="truckRows"></tbody></table></div>
 <div class="empty-state" id="emptyTrucks"><b>No trucks yet.</b>Add your truck so RateConRisk can calculate a real cost per mile.</div>
 </section>
@@ -48,8 +48,73 @@
 <script>
 window.addEventListener("ratecon:appready", async()=>{ try{ 
 const modal=truckModal,open=()=>modal.classList.add("show"),close=()=>modal.classList.remove("show");primaryAction.textContent="Add Truck";primaryAction.onclick=open;closeModal.onclick=cancelModal.onclick=close;
-truckForm.onsubmit=async e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(e.currentTarget).entries()),mm=(fd.makeModel||"").trim().split(/\s+/);await RateConStore.addTruck({...fd,make:mm.shift()||"",model:mm.join(" ")});e.currentTarget.reset();close();render()};
-async function render(){const data=await RateConStore.read();emptyTrucks.style.display=data.trucks.length?"none":"block";truckRows.innerHTML=data.trucks.map(t=>{const m=RateConStore.truckMetrics(t,data);return `<tr><td><div class="truck-title"><span class="truck-unit">${t.unitNumber||"Truck"}</span><span class="small-muted">${[t.year,t.make,t.model].filter(Boolean).join(" ")}</span></div></td><td>${m.loads}</td><td>${Math.round(m.miles).toLocaleString()}</td><td class="money">${RateConStore.money(m.revenue)}</td><td>${RateConStore.money(m.variable)}</td><td>${RateConStore.money(m.fixed)}</td><td class="money">${RateConStore.money2(m.cpm)}</td><td class="profit">${RateConStore.money(m.profit)}</td><td><button class="delete-btn" data-delete="${t.id}">Delete</button></td></tr>`}).join("");document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this truck? Existing loads will remain but become unassigned.")){await RateConStore.removeTruck(b.dataset.delete);render()}})}
+truckForm.onsubmit=async e=>{
+  e.preventDefault();
+
+  const formEl=e.currentTarget;
+  if(formEl.dataset.saving==="1")return;
+
+  const saveBtn=formEl.querySelector('button[type="submit"],button:not([type])');
+  const originalText=saveBtn?.textContent||"Save truck";
+
+  formEl.dataset.saving="1";
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="Saving…";}
+
+  try{
+    const fd=Object.fromEntries(new FormData(formEl).entries());
+    const mm=(fd.makeModel||"").trim().split(/\s+/);
+
+    await RateConStore.addTruck({
+      ...fd,
+      make:mm.shift()||"",
+      model:mm.join(" ")
+    });
+
+    formEl.reset();
+    close();
+    await render();
+
+  }catch(err){
+    console.error(err);
+    alert(err.message||"Could not save truck.");
+  }finally{
+    delete formEl.dataset.saving;
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=originalText;}
+  }
+};
+async function render(){const data=await RateConStore.read();emptyTrucks.style.display=data.trucks.length?"none":"block";truckRows.innerHTML=data.trucks.map(t=>{const m=RateConStore.truckMetrics(t,data);return `<tr><td><div class="truck-title"><span class="truck-unit">${RateConStore.esc(t.unitNumber||"Truck")}</span><span class="small-muted">${RateConStore.esc([t.year,t.make,t.model].filter(Boolean).join(" "))}</span></div></td><td>${m.loads}</td><td>${Math.round(m.miles).toLocaleString()}</td><td class="money">${RateConStore.money(m.revenue)}</td><td>${RateConStore.money(m.variable)}</td><td>${RateConStore.money(m.fixed)}</td><td class="money">${RateConStore.money2(m.cpm)}</td><td class="profit">${RateConStore.money(m.profit)}</td><td><button class="delete-btn" data-delete="${t.id}">Delete</button></td></tr>`}).join("");document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{
+  if(confirm("Delete this truck? Existing loads will remain but become unassigned.")){
+    await RateConStore.removeTruck(b.dataset.delete);
+    await render();
+  }
+});
+
+const duplicateCount=await RateConStore.truckDuplicateCount();
+cleanupDuplicates.style.display=duplicateCount?"":"none";
+cleanupDuplicates.textContent=duplicateCount?`Clean ${duplicateCount} duplicate${duplicateCount===1?"":"s"}`:"Clean duplicates";
+}
+
+cleanupDuplicates.onclick=async()=>{
+  const count=await RateConStore.truckDuplicateCount();
+  if(!count)return;
+
+  if(!confirm(`Remove ${count} exact duplicate truck record${count===1?"":"s"}? Loads and expenses linked to a duplicate will be moved to the copy we keep.`))return;
+
+  cleanupDuplicates.disabled=true;
+  cleanupDuplicates.textContent="Cleaning…";
+
+  try{
+    const removed=await RateConStore.dedupeTrucks();
+    alert(`Removed ${removed} duplicate truck record${removed===1?"":"s"}.`);
+    await render();
+  }catch(err){
+    console.error(err);
+    alert(err.message||"Could not clean duplicates.");
+  }finally{
+    cleanupDuplicates.disabled=false;
+  }
+};
+
 await render();
  }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
 </script>

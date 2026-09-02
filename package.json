@@ -2,6 +2,9 @@
   "name": "rateconrisk",
   "private": true,
   "dependencies": {
-    "@netlify/blobs": "latest"
+    "@netlify/blobs": "^10.0.0"
+  },
+  "scripts": {
+    "test": "node scripts/regression-smoke.mjs"
   }
 }

@@ -214,26 +214,9 @@ Rules:
 15. Preserve uncertainty. If the document says "may result in", "subject to", "can be deducted", or similar, keep that uncertainty in the output.
 16. questions_for_broker must ask only about information that is genuinely unanswered in the document AND could materially affect payment or eligibility. Do not ask whether extra check-call times exist when the document already states the required check calls, unless the document itself indicates another schedule. It is acceptable to return fewer than 3 questions.
 17. load_details is used to create a load record for the carrier. Extract load number, broker/company name, origin, destination, pickup date, delivery date, agreed base/total pay as a numeric dollar amount, and loaded miles when explicitly stated.
-18. For load_details strings that are not found, return an empty string. For numeric fields not found, return 0. Never infer miles, dates, locations, broker names, or dollar amounts.
+18. pickup_date and delivery_date must be returned as YYYY-MM-DD only when the document makes the date explicit and unambiguous. Otherwise return an empty string.
+19. For other load_details strings that are not found, return an empty string. For numeric fields not found, return 0. Never infer miles, dates, locations, broker names, or dollar amounts.
 `;
-
-function extractText(interaction) {
-  if (typeof interaction?.output_text === "string" && interaction.output_text.trim()) {
-    return interaction.output_text.trim();
-  }
-
-  const steps = interaction?.steps || [];
-  for (const step of steps) {
-    if (step?.type !== "model_output") continue;
-    const content = step?.content || [];
-    for (const block of content) {
-      if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
-        return block.text.trim();
-      }
-    }
-  }
-  return null;
-}
 
 
 

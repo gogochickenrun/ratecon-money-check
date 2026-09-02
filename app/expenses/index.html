@@ -41,8 +41,47 @@
 <script>
 window.addEventListener("ratecon:appready", async()=>{ try{ 
 primaryAction.textContent="Add Expense";primaryAction.onclick=()=>document.querySelector("[name=amount]").focus();
-async function render(){const data=await RateConStore.read();loadSelect.innerHTML='<option value="">General / not linked</option>'+data.loads.map(l=>`<option value="${l.id}">${l.loadNumber||"Load"} · ${l.broker||"Unknown broker"}</option>`).join("");truckSelect.innerHTML='<option value="">Unassigned</option>'+data.trucks.map(t=>`<option value="${t.id}">${t.unitNumber}${t.nickname?` · ${t.nickname}`:""}</option>`).join("");emptyExpenses.style.display=data.expenses.length?"none":"block";expenseRows.innerHTML=data.expenses.map(e=>{const l=data.loads.find(x=>x.id===e.loadId),t=data.trucks.find(x=>x.id===e.truckId);return `<tr><td>${e.date||"—"}</td><td>${t?.unitNumber||"—"}</td><td>${l?(l.loadNumber||"Load"):"General"}</td><td>${e.category}</td><td class="route">${e.note||"—"}</td><td class="money">${RateConStore.money2(e.amount)}</td><td><button class="delete-btn" data-delete="${e.id}">Delete</button></td></tr>`}).join("");document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{await RateConStore.removeExpense(b.dataset.delete);render()})}
-expenseForm.onsubmit=async e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(e.currentTarget).entries());if(fd.loadId&&!fd.truckId){const data=await RateConStore.read(),l=data.loads.find(x=>x.id===fd.loadId);if(l)fd.truckId=l.truckId||""}await RateConStore.addExpense(fd);e.currentTarget.reset();render()};await render();
+async function render(){const data=await RateConStore.read();loadSelect.innerHTML='<option value="">General / not linked</option>'+data.loads.map(l=>`<option value="${l.id}">${RateConStore.esc(l.loadNumber||"Load")} · ${RateConStore.esc(l.broker||"Unknown broker")}</option>`).join("");truckSelect.innerHTML='<option value="">Unassigned</option>'+data.trucks.map(t=>`<option value="${t.id}">${RateConStore.esc(t.unitNumber)}${t.nickname?` · ${RateConStore.esc(t.nickname)}`:""}</option>`).join("");emptyExpenses.style.display=data.expenses.length?"none":"block";expenseRows.innerHTML=data.expenses.map(e=>{const l=data.loads.find(x=>x.id===e.loadId),t=data.trucks.find(x=>x.id===e.truckId);return `<tr><td>${RateConStore.esc(e.date||"—")}</td><td>${RateConStore.esc(t?.unitNumber||"—")}</td><td>${RateConStore.esc(l?(l.loadNumber||"Load"):"General")}</td><td>${RateConStore.esc(e.category)}</td><td class="route">${RateConStore.esc(e.note||"—")}</td><td class="money">${RateConStore.money2(e.amount)}</td><td><button class="delete-btn" data-delete="${e.id}">Delete</button></td></tr>`}).join("");document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{await RateConStore.removeExpense(b.dataset.delete);render()})}
+loadSelect.onchange=async()=>{
+  const data=await RateConStore.read();
+  const linked=data.loads.find(l=>l.id===loadSelect.value);
+  if(linked){
+    truckSelect.value=linked.truckId||"";
+    truckSelect.disabled=true;
+  }else{
+    truckSelect.disabled=false;
+  }
+};
+
+expenseForm.onsubmit=async e=>{
+  e.preventDefault();
+  const formEl=e.currentTarget;
+  if(formEl.dataset.saving==="1")return;
+
+  const saveBtn=formEl.querySelector('button[type="submit"],button:not([type])');
+  const originalText=saveBtn?.textContent||"Add expense";
+  formEl.dataset.saving="1";
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="Saving…";}
+
+  try{
+    const fd=Object.fromEntries(new FormData(formEl).entries());
+    if(fd.loadId&&!fd.truckId){
+      const data=await RateConStore.read();
+      const l=data.loads.find(x=>x.id===fd.loadId);
+      if(l)fd.truckId=l.truckId||"";
+    }
+    await RateConStore.addExpense(fd);
+    formEl.reset();
+    await render();
+  }catch(err){
+    console.error(err);
+    alert(err.message||"Could not save expense.");
+  }finally{
+    delete formEl.dataset.saving;
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=originalText;}
+  }
+};
+await render();
  }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
 </script>
 </body></html>

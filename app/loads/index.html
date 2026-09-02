@@ -55,10 +55,49 @@
 window.addEventListener("ratecon:appready", async()=>{ try{ 
 let importDraft=null;try{importDraft=JSON.parse(sessionStorage.getItem("ratecon_import_draft")||"null")}catch{}
 if(importDraft)importBanner.style.display="flex";
-const modal=loadModal,form=loadForm,open=async(prefill={})=>{const data=await RateConStore.read();truckSelect.innerHTML='<option value="">Unassigned</option>'+data.trucks.map(t=>`<option value="${t.id}">${t.unitNumber}${t.nickname?` · ${t.nickname}`:""}</option>`).join("");form.reset();Object.entries(prefill).forEach(([k,v])=>{if(form.elements[k]&&v!==undefined&&v!==null)form.elements[k].value=v});modal.classList.add("show")},close=()=>modal.classList.remove("show");
+const modal=loadModal,form=loadForm,open=async(prefill={})=>{const data=await RateConStore.read();truckSelect.innerHTML='<option value="">Unassigned</option>'+data.trucks.map(t=>`<option value="${t.id}">${RateConStore.esc(t.unitNumber)}${t.nickname?` · ${RateConStore.esc(t.nickname)}`:""}</option>`).join("");form.reset();Object.entries(prefill).forEach(([k,v])=>{if(form.elements[k]&&v!==undefined&&v!==null)form.elements[k].value=v});modal.classList.add("show")},close=()=>modal.classList.remove("show");
 primaryAction.textContent="Add Load";primaryAction.onclick=()=>open();closeModal.onclick=cancelModal.onclick=close;reviewImport.onclick=()=>importDraft&&open(importDraft);exportCsv.onclick=()=>RateConStore.exportLoadsCSV();
-form.onsubmit=async e=>{e.preventDefault();const fd=Object.fromEntries(new FormData(form).entries()),id=fd.id;delete fd.id;if(importDraft&&!id){fd.riskScore=importDraft.riskScore;fd.potentialDeductions=importDraft.potentialDeductions;fd.sourceFilename=importDraft.sourceFilename;fd.documents={rateCon:true}}if(fd.paidDate&&Number(fd.amountPaid||0)>=Number(fd.revenue||0))fd.status="Paid";if(id)await RateConStore.updateLoad(id,fd);else await RateConStore.addLoad(fd);sessionStorage.removeItem("ratecon_import_draft");importDraft=null;importBanner.style.display="none";close();render()};
-async function render(){const data=await RateConStore.read();emptyLoads.style.display=data.loads.length?"none":"block";loadRows.innerHTML=data.loads.map(l=>{const t=data.trucks.find(x=>x.id===l.truckId),direct=RateConStore.loadDirectExpenses(l.id,data),profit=RateConStore.loadTrueProfit(l,data),age=RateConStore.daysOutstanding(l);return `<tr><td>${l.loadNumber||"—"}</td><td>${t?.unitNumber||"—"}</td><td>${l.broker||"—"}</td><td class="route">${l.origin||"?"} → ${l.destination||"?"}</td><td><span class="status">${l.status}</span></td><td class="money">${RateConStore.money(l.revenue)}</td><td>${RateConStore.money(direct)}</td><td class="profit">${RateConStore.money(profit)}</td><td>${l.invoiceNumber||"—"}<div class="small-muted">${l.invoiceDate||""}</div></td><td class="${age!==null&&age>30?"ar-overdue":"ar-current"}">${l.status==="Paid"?(RateConStore.daysToPay(l)!==null?`${RateConStore.daysToPay(l)}d to pay`:"Paid"):(age!==null?`${age}d open`:"—")}</td><td><button class="delete-btn" data-edit="${l.id}">Manage</button> · <button class="delete-btn" data-delete="${l.id}">Delete</button></td></tr>`}).join("");
+form.onsubmit=async e=>{
+  e.preventDefault();
+  if(form.dataset.saving==="1")return;
+
+  const saveBtn=form.querySelector('button[type="submit"],button:not([type])');
+  const originalText=saveBtn?.textContent||"Save load";
+  form.dataset.saving="1";
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent="Saving…";}
+
+  try{
+    const fd=Object.fromEntries(new FormData(form).entries());
+    const id=fd.id;
+    delete fd.id;
+
+    if(importDraft&&!id){
+      fd.riskScore=importDraft.riskScore;
+      fd.potentialDeductions=importDraft.potentialDeductions;
+      fd.sourceFilename=importDraft.sourceFilename;
+      fd.documents={rateCon:true};
+    }
+
+    if(fd.paidDate&&Number(fd.amountPaid||0)>=Number(fd.revenue||0))fd.status="Paid";
+
+    if(id)await RateConStore.updateLoad(id,fd);
+    else await RateConStore.addLoad(fd);
+
+    sessionStorage.removeItem("ratecon_import_draft");
+    importDraft=null;
+    importBanner.style.display="none";
+    close();
+    await render();
+
+  }catch(err){
+    console.error(err);
+    alert(err.message||"Could not save load.");
+  }finally{
+    delete form.dataset.saving;
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent=originalText;}
+  }
+};
+async function render(){const data=await RateConStore.read();emptyLoads.style.display=data.loads.length?"none":"block";loadRows.innerHTML=data.loads.map(l=>{const t=data.trucks.find(x=>x.id===l.truckId),direct=RateConStore.loadDirectExpenses(l.id,data),profit=RateConStore.loadTrueProfit(l,data),age=RateConStore.daysOutstanding(l);return `<tr><td>${RateConStore.esc(l.loadNumber||"—")}</td><td>${RateConStore.esc(t?.unitNumber||"—")}</td><td>${RateConStore.esc(l.broker||"—")}</td><td class="route">${RateConStore.esc(l.origin||"?")} → ${RateConStore.esc(l.destination||"?")}</td><td><span class="status">${RateConStore.esc(l.status)}</span></td><td class="money">${RateConStore.money(l.revenue)}</td><td>${RateConStore.money(direct)}</td><td class="profit">${RateConStore.money(profit)}</td><td>${RateConStore.esc(l.invoiceNumber||"—")}<div class="small-muted">${RateConStore.esc(l.invoiceDate||"")}</div></td><td class="${age!==null&&age>30?"ar-overdue":"ar-current"}">${l.status==="Paid"?(RateConStore.daysToPay(l)!==null?`${RateConStore.daysToPay(l)}d to pay`:"Paid"):(age!==null?`${age}d open`:"—")}</td><td><button class="delete-btn" data-edit="${l.id}">Manage</button> · <button class="delete-btn" data-delete="${l.id}">Delete</button></td></tr>`}).join("");
 document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const l=data.loads.find(x=>x.id===b.dataset.edit);open(l)});document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{if(confirm("Delete this load and linked expenses?")){await RateConStore.removeLoad(b.dataset.delete);render()}})}
 await render();if(importDraft&&new URLSearchParams(location.search).get("import")==="1")await open(importDraft);if(new URLSearchParams(location.search).get("new")==="1")await open();
  }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });

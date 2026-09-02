@@ -301,3 +301,21 @@ Load "true profit" allocates monthly fixed truck cost by the truck's tracked mil
 The publishable key is designed for client-side use. RLS is what protects each user's rows.
 
 Existing `CODEXCN_API_KEY` remains unchanged for Rate Con analysis.
+
+
+## V7 — Save button / duplicate record hotfix
+
+Fixed:
+- Truck modal staying open after a successful cloud insert.
+- Repeated clicks creating duplicate truck rows.
+- Same async form issue on Expenses.
+- Added save locks to Loads too.
+
+Truck page now detects exact duplicate truck records and shows a:
+`Clean N duplicates`
+button.
+
+Cleanup preserves relationships:
+- loads linked to duplicate truck rows are reassigned to the kept truck
+- expenses linked to duplicate truck rows are reassigned to the kept truck
+- duplicate truck rows are then deleted
