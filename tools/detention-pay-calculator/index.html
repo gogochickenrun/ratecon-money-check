@@ -278,4 +278,5 @@ footer{padding:42px 0;border-top:1px solid var(--line);color:#7f8997;font-size:1
 <script>
 function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n||0)}
 function calcDetention(){const a=new Date(document.getElementById('arr').value),d=new Date(document.getElementById('dep').value),f=+document.getElementById('free').value||0,r=+document.getElementById('rate').value||0,inc=+document.getElementById('inc').value||0;if(isNaN(a)||isNaN(d)||d<=a)return;const total=(d-a)/36e5;let bill=Math.max(0,total-f);if(inc>0)bill=Math.floor(bill/inc)*inc;document.getElementById('waitTime').textContent=total.toFixed(2)+' hr';document.getElementById('billTime').textContent=bill.toFixed(2)+' hr';document.getElementById('detMoney').textContent=money(bill*r);}
-</script></body></html>
+</script><script src="/assets/whatsapp.js" defer></script>
+</body></html>

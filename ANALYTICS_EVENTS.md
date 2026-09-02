@@ -31,3 +31,10 @@ No filename or document contents are sent to Google Analytics.
 
 Recommended funnel:
 Rate Con analyzed → Save as Load → Add Truck → Add Expense → Invoice → Paid → Return next week
+
+
+## Support event
+- `whatsapp_support_click`
+  - `support_channel`: `whatsapp`
+  - `page_path`
+  - `placement`

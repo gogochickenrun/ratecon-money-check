@@ -277,4 +277,5 @@ footer{padding:42px 0;border-top:1px solid var(--line);color:#7f8997;font-size:1
 <script>
 function calcAcc(){const vals=[...document.querySelectorAll('.acc')].map(x=>+x.value||0);const total=vals.reduce((a,b)=>a+b,0);document.getElementById('accTotal').textContent=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(total);document.getElementById('accCount').textContent=vals.filter(x=>x>0).length;}
 document.querySelectorAll('.acc').forEach(x=>x.addEventListener('input',calcAcc));calcAcc();
-</script></body></html>
+</script><script src="/assets/whatsapp.js" defer></script>
+</body></html>

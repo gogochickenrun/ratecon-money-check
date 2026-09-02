@@ -34,4 +34,5 @@ window.addEventListener("ratecon:appready", async()=>{ try{
 primaryAction.textContent="Analyze Rate Con";primaryAction.onclick=()=>location.href="/#check";const data=await RateConStore.read(),rows=RateConStore.brokers(data);emptyBrokers.style.display=rows.length?"none":"block";brokerRows.innerHTML=rows.map(b=>{const rc=b.avgRisk>=70?"risk-high":b.avgRisk>=40?"risk-mid":"risk-low";return `<tr><td class="broker-name">${RateConStore.esc(b.broker)}</td><td>${b.loads}</td><td class="money">${RateConStore.money(b.revenue)}</td><td>${RateConStore.money2(b.rpm)}</td><td class="profit">${RateConStore.money(b.profit)}</td><td>${RateConStore.money(b.unpaid)}</td><td>${b.avgDaysToPay===null?"—":`${Math.round(b.avgDaysToPay)} days`}</td><td class="${rc}">${Math.round(b.avgRisk)}/100</td></tr>`}).join("");
  }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
 </script>
+<script src="/assets/whatsapp.js" defer></script>
 </body></html>

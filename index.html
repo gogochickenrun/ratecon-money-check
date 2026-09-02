@@ -412,6 +412,20 @@ footer{padding:42px 0;border-top:1px solid var(--line);color:#7f8997;font-size:1
           <button class="btn" id="saveLoadBtn" type="button">Save as Load</button>
         </div>
 
+        <div class="cta-strip">
+          <div>
+            <h3>Something look wrong?</h3>
+            <p>If the Rate Con analysis missed something or you have a question, message us directly.</p>
+          </div>
+          <a class="btn secondary"
+             href="https://wa.me/19432601577?text=Hi%2C%20I%E2%80%99m%20using%20RateConRisk%20and%20I%20have%20a%20question."
+             target="_blank"
+             rel="noopener noreferrer"
+             onclick="window.rateconTrack?.('whatsapp_support_click',{page_path:location.pathname,support_channel:'whatsapp',placement:'analysis_result'})">
+             Message on WhatsApp
+          </a>
+        </div>
+
         <div class="top-actions-box">
           <div class="top-actions-title">3 things you must not miss</div>
           <div id="topActions"></div>
@@ -559,5 +573,6 @@ if(fileInput)fileInput.addEventListener('change',()=>{
 if(form)form.addEventListener('submit',async e=>{e.preventDefault();errorBox.style.display='none';const file=fileInput.files?.[0];if(!file)return;if(file.size>4*1024*1024){errorBox.textContent='File is too large. Please upload a file under 4 MB.';errorBox.style.display='block';window.rateconTrack?.('ratecon_analysis_error',{error_type:'file_too_large'});return;}const startedAt=Date.now();window.rateconTrack?.('ratecon_analysis_started',{file_type:(file.name.split('.').pop()||'unknown').toLowerCase()});btn.disabled=true;loading.style.display='block';let i=0;loadingText.textContent='Uploading your Rate Con…';loadingTimer=setInterval(()=>{i=(i+1)%loadingMessages.length;loadingText.textContent=loadingMessages[i];},2200);const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));try{const fileData=await readAsDataURL(file);const jobId=(crypto.randomUUID?.()||`${Date.now()}_${Math.random().toString(36).slice(2)}`).replace(/[^a-zA-Z0-9_-]/g,'');const startRes=await fetch('/api/analyze-background',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobId,filename:file.name,mimeType:file.type||'application/pdf',fileData})});if(!startRes.ok&&startRes.status!==202){const raw=await startRes.text();throw new Error(`Could not start analysis (HTTP ${startRes.status}): ${raw.slice(0,180).replace(/\s+/g,' ')}`);}loadingText.textContent='Analyzing contract terms…';let payload=null;const deadline=Date.now()+13*60*1000;while(Date.now()<deadline){await sleep(2500);const statusRes=await fetch(`/api/analyze-status?job=${encodeURIComponent(jobId)}`,{cache:'no-store'});const raw=await statusRes.text();let statusPayload;try{statusPayload=JSON.parse(raw)}catch{throw new Error(`Status server returned HTTP ${statusRes.status} instead of JSON: ${raw.slice(0,160).replace(/\s+/g,' ')}`);}if(statusPayload.status==='done'){payload=statusPayload.result;break;}if(statusPayload.status==='error'||statusPayload.status==='expired'){const apiErr=new Error(statusPayload.error||'Analysis failed.');apiErr.status=statusPayload.providerStatus||statusRes.status;throw apiErr;}if(statusPayload.status==='running'){loadingText.textContent=statusPayload.stage==='analyzing'?'Reading deductions, detention and payment terms…':'Preparing your Rate Con…';}}if(!payload)throw new Error('Analysis is taking unusually long. Please try again.');render(payload);window.rateconTrack?.('ratecon_analysis_success',{risk_score:Number(payload.summary?.risk_score||0),duration_ms:Date.now()-startedAt});}catch(err){errorBox.textContent=err.message||'Analysis failed. Please try again.';errorBox.style.display='block';window.rateconTrack?.('ratecon_analysis_error',{error_type:err.status?`http_${err.status}`:'client_or_network',duration_ms:Date.now()-startedAt});}finally{clearInterval(loadingTimer);loading.style.display='none';btn.disabled=false;}});
 
 </script>
+<script src="/assets/whatsapp.js" defer></script>
 </body>
 </html>

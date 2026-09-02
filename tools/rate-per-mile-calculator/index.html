@@ -276,4 +276,5 @@ footer{padding:42px 0;border-top:1px solid var(--line);color:#7f8997;font-size:1
 <script>
 function calcRPM(){const p=+document.getElementById('pay').value||0,l=+document.getElementById('loaded').value||0,d=+document.getElementById('dead').value||0,c=+document.getElementById('cash').value||0,t=l+d;document.getElementById('trueRpm').textContent=t?('$'+(p/t).toFixed(2)+'/mi'):'$0.00/mi';document.getElementById('loadedRpm').textContent=l?('$'+(p/l).toFixed(2)+'/mi'):'$0.00/mi';document.getElementById('totalMiles').textContent=t.toLocaleString();document.getElementById('netGross').textContent='$'+Math.max(0,p-c).toLocaleString(undefined,{maximumFractionDigits:2});}
 calcRPM();
-</script></body></html>
+</script><script src="/assets/whatsapp.js" defer></script>
+</body></html>

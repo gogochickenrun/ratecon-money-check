@@ -319,3 +319,16 @@ Cleanup preserves relationships:
 - loads linked to duplicate truck rows are reassigned to the kept truck
 - expenses linked to duplicate truck rows are reassigned to the kept truck
 - duplicate truck rows are then deleted
+
+
+## V9 — WhatsApp support
+
+Added site-wide WhatsApp support:
+- floating support button on public and `/app/` pages
+- compact mobile presentation
+- prefilled support message
+- analysis-result WhatsApp CTA
+- GA event: `whatsapp_support_click`
+
+Destination:
+`+1 943 260 1577`

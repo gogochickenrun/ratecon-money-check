@@ -24,3 +24,11 @@ Fixes included:
 - AI load dates normalized to YYYY-MM-DD
 - obsolete unused old analysis/store scripts removed
 - regression smoke test added (`npm test`)
+
+
+V9 support regression:
+- WhatsApp widget included on every HTML page.
+- Existing public/app routes untouched.
+- Rate Con background architecture untouched.
+- Supabase/RLS logic untouched.
+- Support links use `target="_blank"` with `noopener noreferrer`.

@@ -102,4 +102,5 @@ document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{const l=data.
 await render();if(importDraft&&new URLSearchParams(location.search).get("import")==="1")await open(importDraft);if(new URLSearchParams(location.search).get("new")==="1")await open();
  }catch(err){ console.error(err); alert(err.message||"Something went wrong."); } });
 </script>
+<script src="/assets/whatsapp.js" defer></script>
 </body></html>
